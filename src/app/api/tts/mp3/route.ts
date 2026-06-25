@@ -1,13 +1,19 @@
 import { NextResponse } from "next/server";
 import { resolveServerAccess } from "@/lib/commercial/auth";
 import type { VoiceMode } from "@/lib/reader/types";
-import { generateElevenLabsSpeech, isElevenLabsConfigured } from "@/lib/tts/elevenlabs";
+import {
+  createAudioCacheKey,
+  getCachedAudio,
+  setCachedAudio
+} from "@/lib/tts/audio-cache";
+import { synthesizeSpeech } from "@/lib/tts/speech-provider";
 import { getVoiceModeStatus } from "@/lib/tts/providers";
+import { resolveVoiceForSynthesis } from "@/lib/tts/voice-library";
 
 type Mp3RequestBody = {
   text?: string;
   title?: string;
-  voiceId?: string;
+  voiceProfileId?: string;
   rate?: number;
   voiceMode?: VoiceMode;
 };
@@ -37,7 +43,7 @@ export async function POST(request: Request) {
   }
 
   if (voiceMode === "neural") {
-    return generateNeuralMp3(request, text, body.title, body.voiceId);
+    return generateNeuralMp3(request, text, body.title, body.voiceProfileId);
   }
 
   const modeStatus = getVoiceModeStatus(voiceMode);
@@ -56,7 +62,7 @@ export async function POST(request: Request) {
     {
       error: "Gerador de MP3 local não configurado.",
       details:
-        "A voz local do navegador funciona para ouvir em tempo real, mas navegadores não permitem exportá-la como MP3. Para MP3 real, use o modo Neural premium com ElevenLabs configurado."
+        "A voz local do navegador funciona para ouvir em tempo real, mas navegadores não permitem exportá-la como MP3. Para MP3 real, use voz neural Premium."
     },
     { status: 501 }
   );
@@ -66,7 +72,7 @@ async function generateNeuralMp3(
   request: Request,
   text: string,
   title?: string,
-  voiceId?: string
+  voiceProfileId?: string
 ) {
   const access = resolveServerAccess(request);
 
@@ -92,28 +98,54 @@ async function generateNeuralMp3(
     );
   }
 
-  if (!isElevenLabsConfigured()) {
+  const voice = resolveVoiceForSynthesis(voiceProfileId);
+
+  if (voice.missingEnv) {
     return NextResponse.json(
       {
-        error: "ElevenLabs ainda não configurado.",
-        details: "Configure ELEVENLABS_API_KEY no servidor/Vercel."
+        error: `${voice.profileName} ainda não está disponível.`,
+        details: `Configure ${voice.missingEnv} para liberar esta voz sem fingir outra voz no lugar.`
       },
       { status: 503 }
     );
   }
 
-  try {
-    const result = await generateElevenLabsSpeech({ text, voiceId });
+  const cacheKey = createAudioCacheKey({
+    providerId: voice.provider,
+    voiceId: voice.voiceId || "default",
+    text
+  });
+  const cached = getCachedAudio(cacheKey);
 
-    return new Response(result.audio, {
-      status: 200,
-      headers: {
-        "Content-Type": result.contentType,
-        "Content-Disposition": `attachment; filename="${sanitizeFileName(
-          title || "real-reader"
-        )}.mp3"`,
-        "X-REAL-Reader-Characters": String(result.characterCount)
-      }
+  if (cached) {
+    return audioResponse(cached.audio, {
+      title,
+      contentType: cached.contentType,
+      cacheStatus: "HIT",
+      voiceProfile: voice.profileName
+    });
+  }
+
+  try {
+    const result = await synthesizeSpeech(voice.provider, {
+      text,
+      voiceId: voice.voiceId
+    });
+
+    setCachedAudio(cacheKey, {
+      audio: result.audio,
+      contentType: result.contentType,
+      createdAt: Date.now(),
+      providerId: result.providerId,
+      voiceId: result.voiceId
+    });
+
+    return audioResponse(result.audio, {
+      title,
+      contentType: result.contentType,
+      cacheStatus: "MISS",
+      characters: result.characterCount,
+      voiceProfile: voice.profileName
     });
   } catch (error) {
     return NextResponse.json(
@@ -124,6 +156,36 @@ async function generateNeuralMp3(
       { status: 502 }
     );
   }
+}
+
+function audioResponse(
+  audio: ArrayBuffer,
+  {
+    title,
+    contentType,
+    cacheStatus,
+    characters,
+    voiceProfile
+  }: {
+    title?: string;
+    contentType: string;
+    cacheStatus: "HIT" | "MISS";
+    characters?: number;
+    voiceProfile: string;
+  }
+) {
+  return new Response(audio, {
+    status: 200,
+    headers: {
+      "Content-Type": contentType,
+      "Content-Disposition": `attachment; filename="${sanitizeFileName(
+        title || "real-reader"
+      )}.mp3"`,
+      "X-REAL-Reader-Cache": cacheStatus,
+      "X-REAL-Reader-Voice": voiceProfile,
+      ...(characters ? { "X-REAL-Reader-Characters": String(characters) } : {})
+    }
+  });
 }
 
 function isVoiceMode(value: unknown): value is VoiceMode {

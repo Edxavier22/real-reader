@@ -6,7 +6,8 @@ export async function requestMp3Generation(
   readerDocument: ReaderDocument,
   voiceMode: VoiceMode,
   pages: ReaderPage[] = readerDocument.pages,
-  title = readerDocument.name
+  title = readerDocument.name,
+  voiceProfileId?: string
 ) {
   const response = await fetch("/api/tts/mp3", {
     method: "POST",
@@ -16,7 +17,8 @@ export async function requestMp3Generation(
     body: JSON.stringify({
       title,
       text: combinePagesText(pages),
-      voiceMode
+      voiceMode,
+      voiceProfileId
     })
   });
 

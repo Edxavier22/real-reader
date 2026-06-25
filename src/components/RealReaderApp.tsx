@@ -44,6 +44,7 @@ import type {
   StudyBlock,
   VoiceMode
 } from "@/lib/reader/types";
+import type { VoiceLibraryItem } from "@/lib/tts/voice-library";
 import {
   defaultVoiceModeStatuses,
   getVoiceModeStatus,
@@ -78,6 +79,8 @@ export function RealReaderApp() {
   const [voiceModeStatuses, setVoiceModeStatuses] = useState<VoiceModeStatus[]>(
     defaultVoiceModeStatuses
   );
+  const [voiceLibrary, setVoiceLibrary] = useState<VoiceLibraryItem[]>([]);
+  const [selectedVoiceProfileId, setSelectedVoiceProfileId] = useState("narrador");
   const [activeTab, setActiveTab] = useState<ActiveTab>("reader");
   const [ocrStartPage, setOcrStartPage] = useState(1);
   const [ocrEndPage, setOcrEndPage] = useState(20);
@@ -102,6 +105,8 @@ export function RealReaderApp() {
   const activeVoiceModeStatus = getVoiceModeStatus(voiceMode, voiceModeStatuses);
   const isLocalVoiceActive =
     voiceMode === "browser" && activeVoiceModeStatus.available;
+  const selectedVoiceProfile =
+    voiceLibrary.find((voice) => voice.id === selectedVoiceProfileId) ?? null;
 
   const ocrRange = useMemo(
     () => normalizePageRange(ocrStartPage, ocrEndPage, sourceTotalPages),
@@ -147,11 +152,18 @@ export function RealReaderApp() {
           throw new Error("Não foi possível carregar a configuração de voz.");
         }
 
-        return (await response.json()) as { modes?: VoiceModeStatus[] };
+        return (await response.json()) as {
+          modes?: VoiceModeStatus[];
+          voices?: VoiceLibraryItem[];
+        };
       })
       .then((data) => {
         if (active && Array.isArray(data.modes)) {
           setVoiceModeStatuses(data.modes);
+        }
+
+        if (active && Array.isArray(data.voices)) {
+          setVoiceLibrary(data.voices);
         }
       })
       .catch(() => {
@@ -518,7 +530,13 @@ export function RealReaderApp() {
     });
 
     try {
-      await requestMp3Generation(document, voiceMode, target.pages, target.title);
+      await requestMp3Generation(
+        document,
+        voiceMode,
+        target.pages,
+        target.title,
+        selectedVoiceProfileId
+      );
       setMp3Message("MP3 gerado com sucesso.");
     } catch (caughtError) {
       setMp3Message(
@@ -576,6 +594,31 @@ export function RealReaderApp() {
           ? "Modo local ativo. Escolha abaixo uma das vozes disponíveis no seu navegador."
           : "Modo neural premium selecionado. Use os botões de MP3 para gerar áudio no servidor."
         : nextStatus.detail
+    );
+  };
+
+  const handleSelectPremiumVoice = (voice: VoiceLibraryItem) => {
+    if (!currentPlan.features.neuralVoice) {
+      setVoiceMessage(formatPlanRestriction(currentPlan, "Biblioteca de vozes premium"));
+      return;
+    }
+
+    if (voice.id === "minha-voz") {
+      setVoiceMessage(
+        "Minha Voz exige consentimento, validação e Voice ID autorizado antes de uso."
+      );
+      return;
+    }
+
+    if (voice.availability !== "available") {
+      setVoiceMessage(`${voice.name}: ${voice.availabilityLabel}`);
+      return;
+    }
+
+    setSelectedVoiceProfileId(voice.id);
+    setVoiceMode("neural");
+    setVoiceMessage(
+      `Voz Premium selecionada: ${voice.name}. Gere MP3 para ouvir com voz neural.`
     );
   };
 
@@ -831,6 +874,13 @@ export function RealReaderApp() {
         onAddContent={() => fileInputRef.current?.click()}
       />
 
+      <ContinueStudyingCard
+        document={document}
+        history={history}
+        onContinue={continueFromBookmark}
+        onLoadHistory={handleLoadFromHistory}
+      />
+
       <div className="grid flex-1 gap-6 lg:grid-cols-[360px_minmax(0,1fr)]">
         <aside className="space-y-6">
           <section
@@ -983,6 +1033,36 @@ export function RealReaderApp() {
               />
 
               <LastReadCard bookmark={document.lastRead} />
+
+              <PremiumAudioPlayer
+                speech={speech}
+                pages={pages}
+                selectedPageIndex={selectedPageIndex}
+                selectedVoiceName={
+                  voiceMode === "browser"
+                    ? "Voz local"
+                    : selectedVoiceProfile?.name ?? "Voz neural"
+                }
+                onPlayDocument={readDocument}
+                onPlayPage={() => startReadingPage(selectedPageIndex)}
+                onPrevious={() => {
+                  speech.previousPage();
+                  setSelectedPageIndex(Math.max(selectedPageIndex - 1, 0));
+                }}
+                onNext={() => {
+                  speech.nextPage();
+                  setSelectedPageIndex(
+                    Math.min(selectedPageIndex + 1, pages.length - 1)
+                  );
+                }}
+              />
+
+              <PremiumVoiceLibraryPanel
+                voices={voiceLibrary}
+                selectedVoiceId={selectedVoiceProfileId}
+                premiumEnabled={currentPlan.features.neuralVoice}
+                onSelect={handleSelectPremiumVoice}
+              />
 
               <ReaderControls
                 speech={speech}
@@ -1395,6 +1475,243 @@ function LastReadCard({
           ).toLocaleString("pt-BR")}`
         : "nenhum ponto salvo ainda."}
     </div>
+  );
+}
+
+function ContinueStudyingCard({
+  document,
+  history,
+  onContinue,
+  onLoadHistory
+}: {
+  document: ReaderDocument | null;
+  history: HistoryRecord[];
+  onContinue: () => void;
+  onLoadHistory: (record: HistoryRecord) => void;
+}) {
+  const latest = history[0] ?? null;
+
+  if (!document?.lastRead && !latest) {
+    return null;
+  }
+
+  return (
+    <section className="mb-6 rounded-[2rem] border border-real-200 bg-gradient-to-br from-real-700 to-ink p-5 text-white shadow-soft sm:p-6">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-real-100">
+            Continuar estudando
+          </p>
+          <h2 className="mt-2 text-2xl font-black">
+            {document?.lastRead
+              ? `Retomar ${document.name} na página ${document.lastRead.pageNumber}`
+              : `Voltar para ${latest?.name}`}
+          </h2>
+          <p className="mt-2 text-sm leading-6 text-real-50">
+            O usuário Premium não deve procurar onde parou. A experiência precisa
+            puxar o estudo de volta.
+          </p>
+        </div>
+        <button
+          type="button"
+          className="rounded-2xl bg-white px-5 py-4 font-black text-ink transition hover:-translate-y-0.5 hover:shadow-lg"
+          onClick={() => {
+            if (document?.lastRead) {
+              onContinue();
+              return;
+            }
+
+            if (latest) {
+              onLoadHistory(latest);
+            }
+          }}
+        >
+          Continuar agora
+        </button>
+      </div>
+    </section>
+  );
+}
+
+function PremiumAudioPlayer({
+  speech,
+  pages,
+  selectedPageIndex,
+  selectedVoiceName,
+  onPlayDocument,
+  onPlayPage,
+  onPrevious,
+  onNext
+}: {
+  speech: ReturnType<typeof useSpeechReader>;
+  pages: ReaderPage[];
+  selectedPageIndex: number;
+  selectedVoiceName: string;
+  onPlayDocument: () => void;
+  onPlayPage: () => void;
+  onPrevious: () => void;
+  onNext: () => void;
+}) {
+  const activeIndex =
+    speech.status === "playing" || speech.status === "paused"
+      ? speech.currentPageIndex
+      : selectedPageIndex;
+  const totalSeconds = estimateReadingSeconds(pages, speech.rate);
+  const remainingSeconds = estimateReadingSeconds(
+    pages.slice(activeIndex),
+    speech.rate
+  );
+  const progress = pages.length
+    ? Math.round(((activeIndex + 1) / pages.length) * 100)
+    : 0;
+  const currentPage = pages[activeIndex];
+
+  return (
+    <section className="rounded-[2rem] border border-slate-200 bg-gradient-to-br from-white to-real-50 p-5 shadow-soft">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-real-600">
+            Player Premium
+          </p>
+          <h3 className="mt-2 text-2xl font-black text-ink">
+            {currentPage ? `Capítulo atual: página ${currentPage.pageNumber}` : "Pronto para estudar"}
+          </h3>
+          <p className="mt-1 text-sm text-slate-600">
+            Voz: <span className="font-black">{selectedVoiceName}</span> ·{" "}
+            {formatDuration(remainingSeconds)} restantes · {formatDuration(totalSeconds)} no total
+          </p>
+        </div>
+        <div className="rounded-2xl bg-white px-4 py-3 text-sm font-black text-real-700 shadow-sm">
+          Playlist futura preparada
+        </div>
+      </div>
+
+      <div className="mt-5">
+        <div className="h-3 overflow-hidden rounded-full bg-white">
+          <div
+            className="h-full rounded-full bg-real-600 transition-all"
+            style={{ width: `${Math.max(0, Math.min(100, progress))}%` }}
+          />
+        </div>
+        <div className="mt-2 flex justify-between text-xs font-bold text-slate-500">
+          <span>{progress}% do material processado</span>
+          <span>Velocidade {speech.rate.toFixed(1)}x</span>
+        </div>
+      </div>
+
+      <div className="mt-5 flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          className="rounded-full border border-slate-200 bg-white px-4 py-2 font-bold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
+          onClick={onPrevious}
+          disabled={!pages.length}
+        >
+          Capítulo anterior
+        </button>
+        <button
+          type="button"
+          className="rounded-full bg-real-600 px-6 py-3 font-black text-white transition hover:bg-real-700 disabled:opacity-50"
+          onClick={speech.status === "playing" ? speech.pause : onPlayDocument}
+          disabled={!pages.length}
+        >
+          {speech.status === "playing" ? "Pausar" : "Play"}
+        </button>
+        <button
+          type="button"
+          className="rounded-full border border-slate-200 bg-white px-4 py-2 font-bold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
+          onClick={speech.status === "paused" ? speech.resume : onPlayPage}
+          disabled={!pages.length}
+        >
+          {speech.status === "paused" ? "Continuar" : "Página atual"}
+        </button>
+        <button
+          type="button"
+          className="rounded-full border border-slate-200 bg-white px-4 py-2 font-bold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
+          onClick={onNext}
+          disabled={!pages.length}
+        >
+          Próximo capítulo
+        </button>
+      </div>
+    </section>
+  );
+}
+
+function PremiumVoiceLibraryPanel({
+  voices,
+  selectedVoiceId,
+  premiumEnabled,
+  onSelect
+}: {
+  voices: VoiceLibraryItem[];
+  selectedVoiceId: string;
+  premiumEnabled: boolean;
+  onSelect: (voice: VoiceLibraryItem) => void;
+}) {
+  const premiumVoices = voices.filter((voice) => voice.id !== "local-browser");
+
+  if (!premiumVoices.length) {
+    return null;
+  }
+
+  return (
+    <section className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-soft">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-real-600">
+            Biblioteca de Vozes
+          </p>
+          <h3 className="mt-2 text-2xl font-black text-ink">
+            Escolha a experiência que combina com seu estudo.
+          </h3>
+        </div>
+        {!premiumEnabled ? (
+          <a href="/pricing" className="rounded-full bg-real-600 px-4 py-2 text-sm font-black text-white">
+            Liberar Premium
+          </a>
+        ) : null}
+      </div>
+      <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+        {premiumVoices.map((voice) => {
+          const selected = selectedVoiceId === voice.id;
+          const available = premiumEnabled && voice.availability === "available";
+
+          return (
+            <button
+              key={voice.id}
+              type="button"
+              className={[
+                "rounded-3xl border p-4 text-left transition",
+                selected
+                  ? "border-real-400 bg-real-50 ring-2 ring-real-100"
+                  : "border-slate-200 hover:border-real-200 hover:bg-slate-50"
+              ].join(" ")}
+              onClick={() => onSelect(voice)}
+            >
+              <div className="flex items-start justify-between gap-2">
+                <p className="font-black text-ink">{voice.name}</p>
+                <span
+                  className={[
+                    "rounded-full px-2 py-0.5 text-[11px] font-bold",
+                    available
+                      ? "bg-emerald-100 text-emerald-800"
+                      : "bg-amber-100 text-amber-800"
+                  ].join(" ")}
+                >
+                  {available ? "ativa" : "configurar"}
+                </span>
+              </div>
+              <p className="mt-2 text-sm leading-5 text-slate-600">
+                {voice.description}
+              </p>
+              <p className="mt-3 text-xs font-bold uppercase tracking-[0.16em] text-slate-400">
+                {voice.language} · {voice.quality} · {voice.availabilityLabel}
+              </p>
+            </button>
+          );
+        })}
+      </div>
+    </section>
   );
 }
 
@@ -2099,6 +2416,28 @@ function buildProcessingDoneMessage(
   }
 
   return "Arquivo pronto para leitura no modo rápido.";
+}
+
+function estimateReadingSeconds(pages: ReaderPage[], rate: number) {
+  const words = pages.reduce((sum, page) => sum + countWords(page.text), 0);
+  const wordsPerMinute = 165 * Math.max(0.6, rate);
+
+  return Math.max(0, Math.round((words / wordsPerMinute) * 60));
+}
+
+function formatDuration(totalSeconds: number) {
+  if (!totalSeconds) {
+    return "0min";
+  }
+
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.max(1, Math.round((totalSeconds % 3600) / 60));
+
+  if (hours) {
+    return `${hours}h ${minutes}min`;
+  }
+
+  return `${minutes}min`;
 }
 
 function getMp3Target(

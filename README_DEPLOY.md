@@ -1,6 +1,6 @@
 # Deploy do REAL Reader na Vercel
 
-Guia para publicar a V1.3 Comercial.
+Guia para publicar a versão comercial com Sprint 5.
 
 Fontes oficiais úteis:
 
@@ -17,7 +17,7 @@ Fontes oficiais úteis:
    ```bash
    git init
    git add .
-   git commit -m "REAL Reader V1.3 Comercial"
+   git commit -m "REAL Reader Sprint 5"
    git branch -M main
    git remote add origin https://github.com/SEU_USUARIO/real-reader.git
    git push -u origin main
@@ -31,7 +31,7 @@ Fontes oficiais úteis:
 4. Framework: **Next.js**.
 5. Build command: `pnpm build`.
 6. Install command: `pnpm install`.
-7. Output directory: deixe padrão.
+7. Output directory: deixe o padrão.
 
 A Vercel cria deploys automáticos quando há push na branch de produção,
 normalmente `main`.
@@ -50,11 +50,31 @@ Configure:
 NEXT_PUBLIC_APP_URL=https://seu-dominio.vercel.app
 NEXT_PUBLIC_REAL_READER_DEMO_PLAN=free
 
-TTS_PROVIDER=elevenlabs
+SPEECH_PROVIDER=elevenlabs
+TTS_PROVIDER=browser
+TTS_API_KEY=
+
 ELEVENLABS_API_KEY=...
 ELEVENLABS_VOICE_ID=...
 ELEVENLABS_MODEL_ID=eleven_multilingual_v2
 ELEVENLABS_OUTPUT_FORMAT=mp3_44100_128
+
+ELEVENLABS_VOICE_PROFESSOR_ID=
+ELEVENLABS_VOICE_PROFESSORA_ID=
+ELEVENLABS_VOICE_PODCAST_ID=
+ELEVENLABS_VOICE_CALMO_ID=
+ELEVENLABS_VOICE_MOTIVADOR_ID=
+ELEVENLABS_VOICE_JORNALISTA_ID=
+ELEVENLABS_VOICE_STORYTELLING_ID=
+ELEVENLABS_VOICE_INFANTIL_ID=
+
+OPENAI_API_KEY=
+AZURE_SPEECH_KEY=
+GOOGLE_TTS_API_KEY=
+AWS_ACCESS_KEY_ID=
+AWS_SECRET_ACCESS_KEY=
+
+AUTHORIZED_VOICE_ID=
 
 STRIPE_SECRET_KEY=sk_live_...
 STRIPE_PRICE_ID=price_...
@@ -66,9 +86,11 @@ SUPABASE_SERVICE_ROLE_KEY=...
 
 Importante:
 
-- variáveis sem `NEXT_PUBLIC_` ficam no servidor;
+- variáveis sem `NEXT_PUBLIC_` ficam apenas no servidor;
 - depois de mudar variáveis na Vercel, gere um novo deploy;
-- não publique chaves secretas no GitHub.
+- não publique chaves secretas no GitHub;
+- deixe `NEXT_PUBLIC_REAL_READER_DEMO_PLAN=free` em demonstrações públicas;
+- use uma conta Premium real apenas quando Auth/Stripe estiverem conectados.
 
 ## 4. Banco de dados
 
@@ -87,13 +109,22 @@ Importante:
 5. Próximo passo obrigatório para produção: webhook Stripe para atualizar a tabela
    `subscriptions`.
 
-## 6. ElevenLabs
+## 6. Voz neural
+
+### ElevenLabs
 
 1. Crie uma API key na ElevenLabs.
 2. Configure `ELEVENLABS_API_KEY`.
-3. Opcionalmente configure `ELEVENLABS_VOICE_ID`.
-4. Use `TTS_PROVIDER=elevenlabs`.
-5. Teste `/api/tts/neural` com uma conta Premium real ou token de staging.
+3. Configure `SPEECH_PROVIDER=elevenlabs`.
+4. Configure pelo menos `ELEVENLABS_VOICE_ID` para a voz Narrador.
+5. Opcionalmente configure os Voice IDs específicos da biblioteca de vozes.
+6. Teste `/api/tts/neural` com uma conta Premium real ou token de staging.
+
+### Outros providers
+
+OpenAI TTS, Azure Speech, Google TTS e Amazon Polly estão preparados na
+arquitetura, mas seus adapters reais ainda não foram implementados. Não anuncie
+esses providers como disponíveis até que cada adapter seja conectado e testado.
 
 ## 7. Testar produção
 
@@ -107,6 +138,8 @@ Depois do deploy:
    configurada.
 6. Com a chave configurada, teste um texto curto.
 7. Verifique se nenhuma chave secreta aparece no navegador.
+8. Teste a biblioteca de vozes e confirme se vozes sem Voice ID aparecem como
+   “configurar”, não como disponíveis.
 
 ## 8. Build local antes do deploy
 
@@ -114,3 +147,14 @@ Depois do deploy:
 pnpm typecheck
 pnpm build
 ```
+
+## 9. Antes de vender oficialmente
+
+Não vender como SaaS completo antes de concluir:
+
+- Auth real;
+- webhook Stripe;
+- plano Premium validado no servidor;
+- controle real de caracteres de voz;
+- termos de uso e política de privacidade;
+- teste de custo com ElevenLabs em documentos reais.

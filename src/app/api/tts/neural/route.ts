@@ -1,10 +1,16 @@
 import { NextResponse } from "next/server";
 import { resolveServerAccess } from "@/lib/commercial/auth";
-import { generateElevenLabsSpeech, isElevenLabsConfigured } from "@/lib/tts/elevenlabs";
+import {
+  createAudioCacheKey,
+  getCachedAudio,
+  setCachedAudio
+} from "@/lib/tts/audio-cache";
+import { synthesizeSpeech } from "@/lib/tts/speech-provider";
+import { resolveVoiceForSynthesis } from "@/lib/tts/voice-library";
 
 type NeuralRequestBody = {
   text?: string;
-  voiceId?: string;
+  voiceProfileId?: string;
 };
 
 export const dynamic = "force-dynamic";
@@ -54,20 +60,49 @@ export async function POST(request: Request) {
     );
   }
 
-  if (!isElevenLabsConfigured()) {
+  const voice = resolveVoiceForSynthesis(body.voiceProfileId);
+
+  if (voice.missingEnv) {
     return NextResponse.json(
       {
-        error: "ElevenLabs ainda não configurado.",
-        details: "Configure ELEVENLABS_API_KEY no servidor/Vercel."
+        error: `${voice.profileName} ainda não está disponível.`,
+        details: `Configure ${voice.missingEnv} para liberar esta voz.`
       },
       { status: 503 }
     );
   }
 
+  const cacheKey = createAudioCacheKey({
+    providerId: voice.provider,
+    voiceId: voice.voiceId || "default",
+    text
+  });
+  const cached = getCachedAudio(cacheKey);
+
+  if (cached) {
+    return new Response(cached.audio, {
+      status: 200,
+      headers: {
+        "Content-Type": cached.contentType,
+        "Content-Disposition": 'attachment; filename="real-reader-neural.mp3"',
+        "X-REAL-Reader-Cache": "HIT",
+        "X-REAL-Reader-Voice": voice.profileName
+      }
+    });
+  }
+
   try {
-    const result = await generateElevenLabsSpeech({
+    const result = await synthesizeSpeech(voice.provider, {
       text,
-      voiceId: body.voiceId
+      voiceId: voice.voiceId
+    });
+
+    setCachedAudio(cacheKey, {
+      audio: result.audio,
+      contentType: result.contentType,
+      createdAt: Date.now(),
+      providerId: result.providerId,
+      voiceId: result.voiceId
     });
 
     return new Response(result.audio, {
@@ -77,7 +112,8 @@ export async function POST(request: Request) {
         "Content-Disposition": 'attachment; filename="real-reader-neural.mp3"',
         "X-REAL-Reader-Characters": String(result.characterCount),
         "X-REAL-Reader-Voice-Id": result.voiceId,
-        "X-REAL-Reader-Model-Id": result.modelId
+        "X-REAL-Reader-Provider": result.providerId,
+        "X-REAL-Reader-Cache": "MISS"
       }
     });
   } catch (error) {

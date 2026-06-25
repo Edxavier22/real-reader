@@ -7,6 +7,7 @@ import {
 } from "@/lib/product/experience";
 
 const outcomes = [
+  "Ouça com vozes Premium quando o provider neural estiver configurado.",
   "Estude enquanto dirige, caminha ou trabalha.",
   "Transforme apostilas cansativas em uma rotina de áudio.",
   "Revise sem ficar preso à tela.",
@@ -85,6 +86,17 @@ export function LandingPage() {
             >
               Ver plano Premium
             </Link>
+          </div>
+          <div className="mt-4 grid gap-2 text-sm font-bold text-slate-600 sm:grid-cols-3">
+            <span className="rounded-2xl border border-real-100 bg-white/80 px-3 py-2">
+              Voz local grátis
+            </span>
+            <span className="rounded-2xl border border-amber-100 bg-amber-50 px-3 py-2 text-amber-900">
+              Voz neural Premium
+            </span>
+            <span className="rounded-2xl border border-slate-200 bg-white/80 px-3 py-2">
+              Continue de onde parou
+            </span>
           </div>
           <p className="mt-4 text-sm leading-6 text-slate-500">
             O grátis vende experimentação. O Premium vende tempo, foco e

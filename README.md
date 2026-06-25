@@ -1,66 +1,121 @@
 # REAL Reader
 
-REAL Reader é uma plataforma de aprendizado narrado por IA. O produto não é
-vendido como “leitor de PDF”: ele vende tempo, foco e estudo sem tela.
+REAL Reader é uma plataforma de aprendizado narrado por IA.
 
-Posicionamento:
+O produto não é vendido como “leitor de PDF”. Ele vende tempo, foco e estudo sem
+ficar preso à tela.
 
 > Transforme qualquer conteúdo em uma experiência de aprendizado narrada por
 > Inteligência Artificial.
 
-A V1.3 Comercial preserva a base local e adiciona a fundação SaaS: landing page
-de conversão, planos, pricing, login preparado, Stripe Checkout, schema de banco,
-dashboard de aprendizado e voz neural real via ElevenLabs quando as chaves forem
-configuradas.
+## Sprint 5 — Efeito UAU
 
-## O que funciona na V1.3 Comercial
+Objetivo da Sprint: atacar o maior gargalo comercial do produto — a sensação de
+voz robótica — e fazer a experiência Premium parecer um produto profissional.
 
-- Landing page vendável com CTA **Testar grátis** e **Assinar Premium**
-- Landing completa com hero, benefícios, como funciona, antes/depois,
-  depoimentos preparados, planos, FAQ, CTA e rodapé
-- Plano **FREE** com limite de 10 páginas por PDF
-- Plano **PREMIUM** preparado com limite de 300 páginas por PDF
-- Biblioteca Premium de vozes preparada: Professor, Professora, Narrador,
-  Podcast, Calmo, Motivador, Jornalista, Infantil, Storytelling e Minha Voz
-- Arquitetura de modos de estudo por IA: resumos, mapa mental, questões,
-  flashcards, modo aula, podcast e audiobook
-- Dashboard `/dashboard` preparado para métricas de aprendizagem
-- Onboarding inteligente no primeiro acesso
-- Tela do app evoluída para **Minha Biblioteca**
-- Analytics local preparado para eventos reais: onboarding, conteúdo adicionado,
-  documento processado, checkout, MP3 e limpeza de texto
-- Página `/pricing`
-- Páginas `/checkout/success` e `/checkout/cancel`
-- Página `/login` preparada para Supabase Auth
-- Página `/minha-voz` com fluxo de consentimento, sem clonagem ativa
-- Upload local de PDF e imagens (`PNG`, `JPG`, `WEBP`, `BMP`)
-- Modo rápido como padrão
-- OCR completo por intervalo/bloco somente no Premium
-- Blocos, marcador, TXT por bloco e MP3 bloqueados no FREE com aviso claro
-- Histórico local limitado por plano
-- Botão **Limpar texto** para reduzir ruído de OCR
-- Endpoint `/api/checkout/session` para Stripe Checkout
-- Endpoint `/api/tts/neural` para ElevenLabs
-- Endpoint `/api/tts/mp3` com geração neural quando o plano e a API estiverem prontos
-- Schema SQL em `database/schema.sql`
+Entregue nesta Sprint:
+
+- arquitetura desacoplada de provedores de voz;
+- biblioteca profissional de vozes Premium;
+- player Premium com sensação de app de áudio;
+- continuação inteligente para o usuário voltar direto de onde parou;
+- cache de áudio neural no servidor para evitar regeração desnecessária;
+- fluxo profissional de “Minha Voz” sem clonagem ativa;
+- documentação clara sobre o que funciona e o que depende de API externa.
+
+## O que funciona agora
+
+- Landing page orientada a benefício, não tecnologia.
+- Plano **FREE** com experimentação e limite de até 10 páginas por documento.
+- Plano **PREMIUM** preparado para até 300 páginas por documento.
+- Upload local de PDF e imagens (`PNG`, `JPG`, `WEBP`, `BMP`).
+- Modo rápido como padrão.
+- OCR completo apenas por intervalo ou bloco no Premium.
+- Separação de texto por páginas.
+- Leitura local com voz do navegador.
+- Controle de play, pausa, página anterior, próxima página e velocidade.
+- Blocos/módulos de estudo no Premium.
+- Marcador para salvar onde parou.
+- Histórico local limitado por plano.
+- Download `.TXT` do documento inteiro e do bloco selecionado.
+- Botão **Limpar texto** para reduzir ruído de OCR.
+- Endpoint seguro `/api/tts/neural` para voz neural no servidor.
+- Endpoint `/api/tts/mp3` para gerar áudio neural quando o plano e a API estiverem configurados.
+- Página `/minha-voz` com consentimento e regras de uso responsável.
+- Schema SQL em `database/schema.sql`.
+
+## Voz neural e biblioteca de vozes
+
+A Sprint 5 criou uma arquitetura de provedores:
+
+- `browser`: voz local gratuita do navegador;
+- `elevenlabs`: provider neural implementado no servidor;
+- `openai`: provider preparado para adapter futuro;
+- `azure`: provider preparado para adapter futuro;
+- `google`: provider preparado para adapter futuro;
+- `polly`: provider preparado para adapter futuro.
+
+A biblioteca de vozes Premium foi preparada com:
+
+- Professor
+- Professora
+- Narrador
+- Podcast
+- Calmo
+- Motivador
+- Jornalista
+- Storytelling
+- Infantil
+- Minha Voz
+
+Cada voz possui nome, descrição, idioma, gênero, categoria, provider, qualidade,
+tipo de plano e disponibilidade. A interface mostra quando a voz está disponível,
+quando falta configurar uma chave ou quando a voz ainda depende de provider futuro.
+
+Importante: o app não finge voz neural. Se a API não estiver configurada, o usuário
+vê um aviso claro.
+
+## Player Premium
+
+O player foi evoluído para transmitir mais valor percebido:
+
+- barra de progresso;
+- tempo total estimado;
+- tempo restante estimado;
+- página atual;
+- capítulo anterior e próximo;
+- play/pause;
+- velocidade;
+- indicação visual da voz selecionada;
+- preparação para playlist futura.
+
+## Cache de áudio
+
+A geração neural usa cache em memória no servidor para evitar gerar novamente o
+mesmo áudio com o mesmo provider, voz e texto. Isso reduz custo, espera e chamadas
+desnecessárias.
+
+Na produção, o próximo passo é trocar o cache em memória por armazenamento durável
+com expiração e controle por usuário.
 
 ## Planos
 
 | Recurso | FREE | PREMIUM |
 | --- | --- | --- |
-| Páginas por PDF | até 10 | até 300 |
+| Páginas por documento | até 10 | até 300 |
 | Voz local do navegador | sim | sim |
 | Histórico | limitado | avançado |
 | Blocos/módulos | não | sim |
 | OCR completo | não | por intervalo/bloco |
 | Salvar onde parou | não | sim |
 | TXT por bloco | não | sim |
-| Voz neural | não | sim, se ElevenLabs estiver configurado |
-| MP3 | não | página/bloco/documento, se ElevenLabs estiver configurado |
+| Voz neural | não | sim, se provider estiver configurado |
+| MP3 | não | página/bloco/documento, se provider estiver configurado |
+| Minha Voz | não | arquitetura preparada, sem clonagem ativa |
 
 Antes de Supabase/Stripe estarem ligados de verdade, o plano exibido no cliente
-vem de `NEXT_PUBLIC_REAL_READER_DEMO_PLAN`. Em produção, substitua isso pelo
-plano salvo no banco e validado no servidor.
+vem de `NEXT_PUBLIC_REAL_READER_DEMO_PLAN`. Em produção, isso deve ser substituído
+pelo plano salvo no banco e validado no servidor.
 
 ## Variáveis de ambiente
 
@@ -76,10 +131,31 @@ Principais variáveis:
 NEXT_PUBLIC_REAL_READER_DEMO_PLAN=free
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 
+SPEECH_PROVIDER=elevenlabs
 TTS_PROVIDER=browser
+TTS_API_KEY=
+
 ELEVENLABS_API_KEY=
 ELEVENLABS_VOICE_ID=
 ELEVENLABS_MODEL_ID=eleven_multilingual_v2
+ELEVENLABS_OUTPUT_FORMAT=mp3_44100_128
+
+ELEVENLABS_VOICE_PROFESSOR_ID=
+ELEVENLABS_VOICE_PROFESSORA_ID=
+ELEVENLABS_VOICE_PODCAST_ID=
+ELEVENLABS_VOICE_CALMO_ID=
+ELEVENLABS_VOICE_MOTIVADOR_ID=
+ELEVENLABS_VOICE_JORNALISTA_ID=
+ELEVENLABS_VOICE_STORYTELLING_ID=
+ELEVENLABS_VOICE_INFANTIL_ID=
+
+OPENAI_API_KEY=
+AZURE_SPEECH_KEY=
+GOOGLE_TTS_API_KEY=
+AWS_ACCESS_KEY_ID=
+AWS_SECRET_ACCESS_KEY=
+
+AUTHORIZED_VOICE_ID=
 
 STRIPE_SECRET_KEY=
 STRIPE_PRICE_ID=
@@ -92,26 +168,22 @@ SUPABASE_SERVICE_ROLE_KEY=
 Nunca exponha `ELEVENLABS_API_KEY`, `STRIPE_SECRET_KEY` ou
 `SUPABASE_SERVICE_ROLE_KEY` no navegador.
 
-## Voz neural real
-
-A integração ElevenLabs fica no servidor:
-
-- `/api/tts/neural`
-- `/api/tts/mp3` com `voiceMode: "neural"`
-
-Se `ELEVENLABS_API_KEY` não existir, o app retorna aviso claro. Se o usuário não
-tiver plano Premium, o servidor bloqueia a geração.
-
 ## Minha voz autorizada
 
-A página `/minha-voz` prepara o consentimento:
+Não há clonagem ativa na Sprint 5.
 
-- confirmação de titularidade
-- aceite de uso
-- aviso de remoção dos dados
-- campo futuro `voiceId`
+O fluxo preparado é:
 
-Não há clonagem ativa na V1.3. O sistema não permite voz de terceiros.
+1. consentimento;
+2. upload de gravações;
+3. validação de titularidade;
+4. treinamento;
+5. geração/registro de `voiceId`;
+6. remoção sob solicitação;
+7. conformidade LGPD.
+
+Regra: jamais permitir voz de terceiros. A voz só pode ser usada com consentimento
+explícito do dono da voz.
 
 ## Banco de dados
 
@@ -147,11 +219,30 @@ pnpm typecheck
 pnpm build
 ```
 
-## Observação importante
+## O que depende de configuração externa
 
-A V1.3 deixa as peças comerciais prontas, mas não finge login, pagamento ou
-assinatura ativa sem configuração real. Recursos externos dependem das chaves e
-dos webhooks corretos.
+- Voz neural real depende de `ELEVENLABS_API_KEY`.
+- Vozes específicas dependem dos respectivos `ELEVENLABS_VOICE_*_ID`.
+- Checkout real depende de Stripe.
+- Login real e assinatura real dependem de Supabase/Auth e webhooks.
+- “Minha Voz” depende de provider com fluxo completo de consentimento, validação
+  e remoção.
+
+## O que ficou fora da Sprint 5
+
+Ficaram no backlog por não resolverem diretamente o gargalo do “UAU” da voz:
+
+- Dashboard novo;
+- Quiz;
+- Flashcards;
+- Professor IA;
+- Chat IA;
+- Gamificação;
+- Empresas;
+- Resumos IA;
+- Mapas mentais;
+- Biblioteca persistente;
+- Mobile avançado.
 
 ## Regra de produto
 
@@ -161,23 +252,3 @@ Toda nova funcionalidade deve responder “sim” à pergunta:
 
 Se não aumentar conversão, retenção, receita ou percepção Premium, entra no
 backlog em vez de ser implementada agora.
-
-## Sprint atual — Biblioteca de Estudos
-
-Objetivo: fazer o usuário sentir que entrou no lugar onde estuda, não em um
-leitor de PDF.
-
-Escopo entregue:
-
-- onboarding por objetivo de aprendizado;
-- preferência de estudo;
-- área **Minha Biblioteca**;
-- continue estudando;
-- recomendações simples baseadas no perfil;
-- arquitetura local de analytics.
-
-Critérios de sucesso desta Sprint:
-
-- mais usuários clicando em **Adicionar conteúdo**;
-- maior clareza do valor Premium;
-- base pronta para medir retenção e conversão sem inventar métricas.
