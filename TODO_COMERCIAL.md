@@ -56,3 +56,31 @@
 - [ ] Criar página de suporte.
 - [ ] Criar monitoramento de erros e custos.
 - [ ] Fazer teste ponta a ponta em ambiente de staging.
+
+## Backlog orientado a pagamento
+
+Só implementar quando houver impacto claro em conversão, retenção ou receita:
+
+- [ ] Persistir perfil de aprendizado no banco.
+- [ ] Sincronizar onboarding entre dispositivos.
+- [ ] Transformar recomendações em ações reais com IA.
+- [ ] Conectar analytics local a PostHog, Plausible, Segment ou ferramenta escolhida.
+- [ ] Importação Word, PowerPoint, EPUB, HTML e páginas web.
+- [ ] YouTube, áudio e vídeo.
+- [ ] Biblioteca persistente e coleções.
+- [ ] Playlist e fila de documentos.
+- [ ] Player mobile estilo Spotify.
+- [ ] Modo carro, caminhada, academia e escuro.
+- [ ] Professor Virtual e chat sobre documento.
+- [ ] Empresas: universidades, cursos, escolas, treinamentos corporativos e EAD.
+- [ ] Programa de indicação e métricas de LTV/churn.
+
+## Icebox
+
+Ideias úteis, mas fora da Sprint atual:
+
+- [ ] Avatares animados.
+- [ ] Ranking público entre usuários.
+- [ ] Marketplace de vozes.
+- [ ] Comunidade/social feed.
+- [ ] Editor completo de documentos.

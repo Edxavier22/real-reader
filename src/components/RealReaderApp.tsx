@@ -31,6 +31,8 @@ import {
   formatPlanRestriction,
   getClientConfiguredPlan
 } from "@/lib/commercial/plans";
+import { LearningWorkspace } from "@/components/LearningWorkspace";
+import { trackProductEvent } from "@/lib/product/analytics";
 import type {
   ExtractionMode,
   HistoryRecord,
@@ -257,6 +259,12 @@ export function RealReaderApp() {
             result.totalPages
           );
           persistDocument(processedDocument);
+          trackProductEvent("document_processed", {
+            sourceType,
+            processedPages: result.pages.length,
+            totalPages: result.totalPages,
+            plan: currentPlan.id
+          });
           setSelectedPageIndex(0);
           setProgress({
             phase: "done",
@@ -284,6 +292,12 @@ export function RealReaderApp() {
           imagePages.length
         );
         persistDocument(processedDocument);
+        trackProductEvent("document_processed", {
+          sourceType,
+          processedPages: imagePages.length,
+          totalPages: imagePages.length,
+          plan: currentPlan.id
+        });
         setSelectedPageIndex(0);
         setProgress({
           phase: "done",
@@ -497,6 +511,11 @@ export function RealReaderApp() {
     }
 
     setMp3Message(`Preparando MP3 neural de ${target.label}...`);
+    trackProductEvent("mp3_generation_requested", {
+      scope,
+      plan: currentPlan.id,
+      voiceMode
+    });
 
     try {
       await requestMp3Generation(document, voiceMode, target.pages, target.title);
@@ -530,6 +549,10 @@ export function RealReaderApp() {
     };
 
     persistDocument(nextDocument);
+    trackProductEvent("text_cleaned", {
+      pages: cleanedPages.length,
+      plan: currentPlan.id
+    });
     setVoiceMessage(
       "Texto limpo. Revise trechos importantes: OCR pode conter erros dependendo da qualidade do PDF."
     );
@@ -791,9 +814,22 @@ export function RealReaderApp() {
             >
               Minha voz
             </a>
+            <a
+              href="/dashboard"
+              className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-black text-slate-700 transition hover:bg-slate-50"
+            >
+              Dashboard
+            </a>
           </div>
         </section>
       </header>
+
+      <LearningWorkspace
+        history={history}
+        currentDocument={document}
+        plan={currentPlan}
+        onAddContent={() => fileInputRef.current?.click()}
+      />
 
       <div className="grid flex-1 gap-6 lg:grid-cols-[360px_minmax(0,1fr)]">
         <aside className="space-y-6">

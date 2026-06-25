@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { trackProductEvent } from "@/lib/product/analytics";
 
 export function CheckoutButton() {
   const [message, setMessage] = useState("");
@@ -9,6 +10,9 @@ export function CheckoutButton() {
   const startCheckout = async () => {
     setLoading(true);
     setMessage("");
+    trackProductEvent("checkout_started", {
+      source: "pricing"
+    });
 
     try {
       const response = await fetch("/api/checkout/session", {

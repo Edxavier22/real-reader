@@ -1,15 +1,34 @@
 # REAL Reader
 
-REAL Reader é um leitor web para transformar PDFs, imagens e apostilas em áudio
-de estudo. A V1.3 Comercial preserva a V1.2 local e adiciona a base SaaS:
-landing page, planos, pricing, login preparado, Stripe Checkout, schema de banco
-e voz neural real via ElevenLabs quando as chaves forem configuradas.
+REAL Reader é uma plataforma de aprendizado narrado por IA. O produto não é
+vendido como “leitor de PDF”: ele vende tempo, foco e estudo sem tela.
+
+Posicionamento:
+
+> Transforme qualquer conteúdo em uma experiência de aprendizado narrada por
+> Inteligência Artificial.
+
+A V1.3 Comercial preserva a base local e adiciona a fundação SaaS: landing page
+de conversão, planos, pricing, login preparado, Stripe Checkout, schema de banco,
+dashboard de aprendizado e voz neural real via ElevenLabs quando as chaves forem
+configuradas.
 
 ## O que funciona na V1.3 Comercial
 
 - Landing page vendável com CTA **Testar grátis** e **Assinar Premium**
+- Landing completa com hero, benefícios, como funciona, antes/depois,
+  depoimentos preparados, planos, FAQ, CTA e rodapé
 - Plano **FREE** com limite de 10 páginas por PDF
 - Plano **PREMIUM** preparado com limite de 300 páginas por PDF
+- Biblioteca Premium de vozes preparada: Professor, Professora, Narrador,
+  Podcast, Calmo, Motivador, Jornalista, Infantil, Storytelling e Minha Voz
+- Arquitetura de modos de estudo por IA: resumos, mapa mental, questões,
+  flashcards, modo aula, podcast e audiobook
+- Dashboard `/dashboard` preparado para métricas de aprendizagem
+- Onboarding inteligente no primeiro acesso
+- Tela do app evoluída para **Minha Biblioteca**
+- Analytics local preparado para eventos reais: onboarding, conteúdo adicionado,
+  documento processado, checkout, MP3 e limpeza de texto
 - Página `/pricing`
 - Páginas `/checkout/success` e `/checkout/cancel`
 - Página `/login` preparada para Supabase Auth
@@ -133,3 +152,32 @@ pnpm build
 A V1.3 deixa as peças comerciais prontas, mas não finge login, pagamento ou
 assinatura ativa sem configuração real. Recursos externos dependem das chaves e
 dos webhooks corretos.
+
+## Regra de produto
+
+Toda nova funcionalidade deve responder “sim” à pergunta:
+
+> Isso aumenta significativamente a chance de alguém pagar pelo REAL Reader?
+
+Se não aumentar conversão, retenção, receita ou percepção Premium, entra no
+backlog em vez de ser implementada agora.
+
+## Sprint atual — Biblioteca de Estudos
+
+Objetivo: fazer o usuário sentir que entrou no lugar onde estuda, não em um
+leitor de PDF.
+
+Escopo entregue:
+
+- onboarding por objetivo de aprendizado;
+- preferência de estudo;
+- área **Minha Biblioteca**;
+- continue estudando;
+- recomendações simples baseadas no perfil;
+- arquitetura local de analytics.
+
+Critérios de sucesso desta Sprint:
+
+- mais usuários clicando em **Adicionar conteúdo**;
+- maior clareza do valor Premium;
+- base pronta para medir retenção e conversão sem inventar métricas.

@@ -34,6 +34,7 @@
 ## V1.3 Comercial — SaaS vendável
 
 - [x] Landing page vendável
+- [x] Landing com hero, benefícios, como funciona, antes/depois, depoimentos, planos, FAQ e rodapé
 - [x] Página `/pricing`
 - [x] Planos FREE e PREMIUM
 - [x] Limite de páginas por plano na UI
@@ -47,6 +48,12 @@
 - [x] MP3 neural por página, bloco ou documento
 - [x] Página `/minha-voz` com consentimento sem clonagem ativa
 - [x] Botão **Limpar texto**
+- [x] Biblioteca Premium de vozes preparada
+- [x] Arquitetura de modos de estudo por IA
+- [x] Página `/dashboard` para métricas de aprendizagem
+- [x] Onboarding inteligente por objetivo e preferência
+- [x] Tela **Minha Biblioteca**
+- [x] Analytics local preparado para eventos reais
 - [x] README_DEPLOY.md
 - [x] TODO_COMERCIAL.md
 
@@ -62,6 +69,11 @@
 - [ ] Criar painel de conta/assinatura
 - [ ] Testar geração neural com volume real e custo controlado
 - [ ] Criar fila/worker para MP3 de documentos grandes
+- [ ] Conectar dashboard a eventos reais de uso
+- [ ] Criar Biblioteca/Playlist persistente
+- [ ] Conectar provider de IA para resumos, quiz, flashcards e chat
+- [ ] Enviar eventos locais para ferramenta real de analytics
+- [ ] Criar experimento A/B de headline da landing
 
 ## V2 — SaaS completo
 
