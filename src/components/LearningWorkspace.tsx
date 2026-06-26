@@ -35,24 +35,17 @@ export function LearningWorkspace({
     setProfile(readLearningProfile());
   }, []);
 
-  const recommendation = useMemo(() => {
+  const latestDocument = currentDocument ?? history[0] ?? null;
+  const hasSavedProgress = Boolean(latestDocument?.lastRead);
+
+  const welcome = useMemo(() => {
     if (!profile) {
-      return "Configure seu perfil para receber recomendações de estudo.";
+      return "Bom te ver por aqui. Envie um conteúdo e comece a ouvir.";
     }
 
-    if (profile.objective === "concurso") {
-      return "Priorize capítulos curtos, revisão recorrente e questões quando a IA estiver conectada.";
-    }
-
-    if (profile.preference === "escutando") {
-      return "Use blocos menores e velocidade confortável para transformar deslocamento em estudo.";
-    }
-
-    if (profile.preference === "flashcards" || profile.preference === "questoes") {
-      return "Quando a IA estiver ativa, transforme capítulos em recuperação ativa.";
-    }
-
-    return "Comece com um documento curto e crie rotina antes de processar materiais longos.";
+    return `Foco: ${getObjectiveLabel(profile.objective)} · ${getPreferenceLabel(
+      profile.preference
+    )}.`;
   }, [profile]);
 
   const saveProfile = () => {
@@ -78,47 +71,76 @@ export function LearningWorkspace({
   };
 
   return (
-    <section className="mb-6 rounded-[2rem] border border-white/80 bg-white/85 p-5 shadow-soft backdrop-blur sm:p-6">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+    <section className="mb-5 rounded-[2rem] border border-white/80 bg-white/90 p-5 shadow-soft backdrop-blur sm:p-6">
+      <div className="grid gap-5 lg:grid-cols-[1fr_320px] lg:items-center">
         <div>
           <p className="text-sm font-semibold uppercase tracking-[0.2em] text-real-600">
             Minha Biblioteca
           </p>
-          <h2 className="mt-2 text-3xl font-black tracking-tight text-ink">
-            {profile
-              ? `Seu espaço de estudo: ${getObjectiveLabel(profile.objective)}`
-              : "Vamos personalizar seu jeito de aprender."}
+          <h2 className="mt-2 text-3xl font-black tracking-tight text-ink sm:text-4xl">
+            {welcome}
           </h2>
           <p className="mt-2 max-w-2xl leading-7 text-slate-600">
-            {profile
-              ? `Preferência principal: ${getPreferenceLabel(
-                  profile.preference
-                )}. ${recommendation}`
-              : "Responda duas perguntas rápidas para o REAL Reader deixar de ser upload e virar rotina de aprendizado."}
+            A ação principal é simples: adicionar conteúdo e apertar play.
           </p>
         </div>
         <button
           type="button"
-          className="rounded-2xl bg-real-600 px-5 py-4 font-black text-white transition hover:-translate-y-0.5 hover:bg-real-700"
+          className="rounded-[1.5rem] bg-real-600 px-6 py-5 text-lg font-black text-white shadow-soft transition hover:-translate-y-0.5 hover:bg-real-700"
           onClick={addContent}
         >
-          Adicionar conteúdo
+          + Adicionar conteúdo
         </button>
       </div>
 
-      {!profile ? (
-        <div className="mt-6 grid gap-4 lg:grid-cols-2">
+      <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <WorkspaceCard
+          title="Biblioteca"
+          value={`${history.length} documento(s)`}
+          text="Seus arquivos recentes ficam neste navegador."
+        />
+        <WorkspaceCard
+          title="Últimos documentos"
+          value={latestDocument?.name ?? "Nenhum ainda"}
+          text={latestDocument ? "Clique no histórico para reabrir." : "Envie o primeiro arquivo."}
+          truncate
+        />
+        <WorkspaceCard
+          title="Continuar de onde parou"
+          value={hasSavedProgress ? `Página ${latestDocument?.lastRead?.pageNumber}` : "Premium"}
+          text={
+            plan.features.bookmarks
+              ? "Seu ponto salvo aparece aqui."
+              : "O Premium salva seu progresso."
+          }
+        />
+        <WorkspaceCard
+          title="Plano atual"
+          value={plan.name}
+          text={
+            plan.id === "premium"
+              ? "Voz neural, blocos e MP3 liberados conforme configuração."
+              : "Teste rápido com voz local."
+          }
+        />
+      </div>
+
+      <details className="mt-4 rounded-3xl border border-slate-200 bg-slate-50 p-4">
+        <summary className="cursor-pointer text-sm font-black text-slate-700">
+          Personalizar meu estudo depois
+        </summary>
+        <div className="mt-4 grid gap-4 lg:grid-cols-2">
           <OnboardingGroup
-            title="Qual seu objetivo principal?"
+            title="Objetivo"
             options={learningObjectiveOptions}
             value={objective}
             onChange={(value) => setObjective(value as LearningObjective)}
           />
           <OnboardingGroup
-            title="Como você prefere aprender?"
+            title="Preferência"
             options={learningPreferenceOptions.map((option) => ({
               ...option,
-              promise: "Personaliza sua experiência de estudo."
+              promise: "Personaliza sua experiência."
             }))}
             value={preference}
             onChange={(value) => setPreference(value as LearningPreference)}
@@ -128,28 +150,40 @@ export function LearningWorkspace({
             className="rounded-2xl bg-ink px-5 py-4 font-black text-white transition hover:-translate-y-0.5 lg:col-span-2"
             onClick={saveProfile}
           >
-            Criar minha experiência de estudo
+            Salvar preferências
           </button>
         </div>
-      ) : (
-        <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <LearningStat label="Documentos na biblioteca" value={history.length} />
-          <LearningStat
-            label="Continue estudando"
-            value={currentDocument?.name ?? history[0]?.name ?? "Nenhum documento"}
-            compact
-          />
-          <LearningStat label="Plano atual" value={plan.name} compact />
-          <LearningStat label="Tempo estudado" value="A registrar" compact />
-        </div>
-      )}
-
-      <div className="mt-5 grid gap-3 lg:grid-cols-3">
-        <LearningCollection title="Continue estudando" text="Retome seu último conteúdo sem procurar arquivo." />
-        <LearningCollection title="Objetivos de estudo" text="Metas semanais entram quando analytics e login forem conectados." />
-        <LearningCollection title="Recomendações" text={recommendation} />
-      </div>
+      </details>
     </section>
+  );
+}
+
+function WorkspaceCard({
+  title,
+  value,
+  text,
+  truncate = false
+}: {
+  title: string;
+  value: string;
+  text: string;
+  truncate?: boolean;
+}) {
+  return (
+    <div className="rounded-3xl border border-slate-200 bg-white p-4">
+      <p className="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">
+        {title}
+      </p>
+      <p
+        className={[
+          "mt-2 text-xl font-black text-ink",
+          truncate ? "truncate" : ""
+        ].join(" ")}
+      >
+        {value}
+      </p>
+      <p className="mt-2 text-sm leading-6 text-slate-500">{text}</p>
+    </div>
   );
 }
 
@@ -181,40 +215,12 @@ function OnboardingGroup({
             onClick={() => onChange(option.value)}
           >
             <p className="font-bold text-ink">{option.label}</p>
-            <p className="mt-1 text-xs leading-5 text-slate-500">{option.promise}</p>
+            <p className="mt-1 text-xs leading-5 text-slate-500">
+              {option.promise}
+            </p>
           </button>
         ))}
       </div>
-    </div>
-  );
-}
-
-function LearningStat({
-  label,
-  value,
-  compact = false
-}: {
-  label: string;
-  value: string | number;
-  compact?: boolean;
-}) {
-  return (
-    <div className="rounded-3xl border border-slate-200 bg-white p-4">
-      <p className={compact ? "truncate text-lg font-black text-ink" : "text-3xl font-black text-ink"}>
-        {value}
-      </p>
-      <p className="mt-1 text-xs font-bold uppercase tracking-[0.16em] text-slate-500">
-        {label}
-      </p>
-    </div>
-  );
-}
-
-function LearningCollection({ title, text }: { title: string; text: string }) {
-  return (
-    <div className="rounded-3xl border border-dashed border-slate-300 bg-slate-50 p-4">
-      <p className="font-black text-ink">{title}</p>
-      <p className="mt-2 text-sm leading-6 text-slate-600">{text}</p>
     </div>
   );
 }

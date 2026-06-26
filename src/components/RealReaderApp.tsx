@@ -338,6 +338,22 @@ export function RealReaderApp() {
     [currentPlan.maxPagesPerPdf, currentPlan.name, persistDocument, speech.stop]
   );
 
+  useEffect(() => {
+    const handleExternalUpload = (event: Event) => {
+      const file = (event as CustomEvent<{ file?: File }>).detail?.file;
+
+      if (file) {
+        void processFile(file);
+      }
+    };
+
+    window.addEventListener("real-reader-upload-file", handleExternalUpload);
+
+    return () => {
+      window.removeEventListener("real-reader-upload-file", handleExternalUpload);
+    };
+  }, [processFile]);
+
   const processCompleteRange = useCallback(
     async (range: PageRange, label: string) => {
       if (!currentPlan.features.fullOcr) {
@@ -814,31 +830,28 @@ export function RealReaderApp() {
 
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-7xl flex-col px-4 py-6 sm:px-6 lg:px-8">
-      <header className="mb-8 grid gap-6 lg:grid-cols-[1.1fr_0.9fr] lg:items-end">
+      <header className="mb-5 grid gap-4 lg:grid-cols-[1fr_auto] lg:items-center">
         <section>
-          <div className="mb-4 inline-flex items-center rounded-full border border-real-100 bg-white/70 px-3 py-1 text-sm font-medium text-real-700 shadow-sm backdrop-blur">
-            REAL Reader · V1.3 Comercial
+          <div className="mb-3 inline-flex items-center rounded-full border border-real-100 bg-white/70 px-3 py-1 text-sm font-medium text-real-700 shadow-sm backdrop-blur">
+            Workspace REAL Reader
           </div>
-          <h1 className="max-w-3xl text-4xl font-black tracking-tight text-ink sm:text-6xl">
-            Estude PDFs longos com limite por plano.
+          <h1 className="max-w-3xl text-3xl font-black tracking-tight text-ink sm:text-5xl">
+            Sua biblioteca de estudos.
           </h1>
-          <p className="mt-4 max-w-2xl text-lg leading-8 text-slate-700">
-            Comece grátis com voz local. Assine Premium para blocos, OCR completo,
-            voz neural e MP3 real quando as chaves estiverem configuradas.
+          <p className="mt-3 max-w-2xl text-base leading-7 text-slate-700">
+            Envie um documento, escolha a voz e aperte play.
           </p>
         </section>
 
-        <section className="rounded-3xl border border-white/80 bg-white/70 p-5 shadow-soft backdrop-blur">
-          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-real-600">
+        <section className="rounded-3xl border border-white/80 bg-white/70 p-4 shadow-soft backdrop-blur">
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-real-600">
             Plano atual: {currentPlan.name}
           </p>
-          <div className="mt-4 grid grid-cols-2 gap-3 text-sm text-slate-700">
+          <div className="mt-3 grid grid-cols-2 gap-2 text-sm text-slate-700">
             <FeaturePill label={`${currentPlan.maxPagesPerPdf} págs/PDF`} />
-            <FeaturePill label={isPremiumPlan ? "Blocos" : "Sem blocos"} />
             <FeaturePill label={isPremiumPlan ? "Voz neural" : "Voz local"} />
-            <FeaturePill label={isPremiumPlan ? "MP3" : "Sem MP3"} />
           </div>
-          <div className="mt-4 flex flex-wrap gap-2">
+          <div className="mt-3 flex flex-wrap gap-2">
             <a
               href="/pricing"
               className="rounded-full bg-real-600 px-4 py-2 text-sm font-black text-white transition hover:bg-real-700"

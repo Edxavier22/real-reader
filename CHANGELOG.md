@@ -1,5 +1,41 @@
 # Changelog
 
+## Sprint — UX, Conversão e Primeiro Áudio
+
+Data: 2026-06-26
+
+### Objetivo
+
+Reduzir o tempo entre o visitante entrar no site e ouvir o primeiro documento.
+
+### Entregue
+
+- Home reduzida para Hero, upload, três passos, Premium compacto, FAQ e rodapé.
+- Upload no Hero com escolha/arraste de arquivo enviando diretamente para o
+  workspace.
+- Workspace reposicionado como interface de app, com foco em **Adicionar
+  conteúdo**.
+- Onboarding movido para personalização opcional, sem bloquear upload.
+- Conteúdos longos removidos da Home e reorganizados em páginas específicas:
+  `/vozes`, `/ia-estudos`, `/analytics`, `/roadmap`, `/biblioteca-futura`,
+  `/metricas` e `/depoimentos`.
+- Premium reposicionado para aparecer depois da experimentação, com benefícios
+  essenciais e sem lista longa de recursos.
+
+### Critérios de sucesso
+
+- O usuário entende o produto em menos de 5 segundos.
+- O upload é a ação mais visível da primeira tela.
+- O usuário consegue chegar ao primeiro play em menos de um minuto.
+- A Home não interrompe a experiência com blocos institucionais longos.
+
+### Backlog gerado
+
+- Medir evento real de `first_play`.
+- Criar funil Home → Upload → Primeiro Play → Clique Premium.
+- Testar variações de headline e CTA.
+- Criar prévia curta de voz Premium sem exigir geração completa de MP3.
+
 ## Sprint 5 — Efeito UAU da Voz Premium
 
 Data: 2026-06-25

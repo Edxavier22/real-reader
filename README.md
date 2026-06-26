@@ -8,6 +8,34 @@ ficar preso à tela.
 > Transforme qualquer conteúdo em uma experiência de aprendizado narrada por
 > Inteligência Artificial.
 
+## Sprint — UX, Conversão e Primeiro Áudio
+
+Objetivo da Sprint: reduzir o caminho entre entrar no site e ouvir o primeiro
+documento.
+
+Mudanças entregues:
+
+- Home encurtada para Hero, upload, 3 passos, Premium compacto, FAQ e rodapé.
+- Upload no Hero: escolher ou arrastar arquivo já envia o arquivo para o workspace.
+- Workspace reposicionado como app de estudo, não apresentação institucional.
+- Onboarding deixou de bloquear a experiência e virou personalização opcional.
+- Ação principal ficou clara: **Adicionar conteúdo**.
+- Conteúdos longos saíram da Home e foram para páginas próprias:
+  - `/vozes`
+  - `/ia-estudos`
+  - `/dashboard`
+  - `/analytics`
+  - `/minha-voz`
+  - `/roadmap`
+  - `/biblioteca-futura`
+  - `/metricas`
+  - `/depoimentos`
+
+Métrica de sucesso desta Sprint:
+
+> O usuário deve conseguir entrar, enviar um documento e chegar ao primeiro play
+> em menos de um minuto.
+
 ## Sprint 5 — Efeito UAU
 
 Objetivo da Sprint: atacar o maior gargalo comercial do produto — a sensação de
@@ -25,7 +53,10 @@ Entregue nesta Sprint:
 
 ## O que funciona agora
 
-- Landing page orientada a benefício, não tecnologia.
+- Landing page curta, orientada a upload e primeiro áudio.
+- Upload direto no Hero com envio do arquivo para o workspace.
+- Páginas específicas para vozes, IA de estudos, analytics, roadmap, biblioteca
+  futura, métricas e depoimentos.
 - Plano **FREE** com experimentação e limite de até 10 páginas por documento.
 - Plano **PREMIUM** preparado para até 300 páginas por documento.
 - Upload local de PDF e imagens (`PNG`, `JPG`, `WEBP`, `BMP`).

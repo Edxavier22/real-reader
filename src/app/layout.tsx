@@ -2,9 +2,9 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "REAL Reader — PDFs em áudio de estudo",
+  title: "REAL Reader — estude enquanto vive sua rotina",
   description:
-    "Transforme PDFs longos em áudio de estudo com OCR, blocos por capítulo e voz neural premium."
+    "Transforme documentos em áudio de estudo. Envie um PDF ou imagem, ouça rápido e desbloqueie voz humana no Premium."
 };
 
 export const viewport: Viewport = {

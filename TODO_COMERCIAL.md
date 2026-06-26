@@ -6,6 +6,17 @@ receita ou percepção Premium, não entra na sprint atual.
 
 ## Alta prioridade antes de vender em produção
 
+### Funil de primeiro áudio
+
+- [ ] Registrar evento real `landing_viewed`.
+- [ ] Registrar evento real `hero_upload_started`.
+- [ ] Registrar evento real `document_processed`.
+- [ ] Registrar evento real `first_play`.
+- [ ] Medir tempo entre visita, upload, processamento e primeiro play.
+- [ ] Criar funil Home → Upload → Primeiro Play → Premium.
+- [ ] Testar A/B de headline: “Estude enquanto dirige” vs “Sua apostila agora fala”.
+- [ ] Testar A/B de CTA: “Experimentar grátis” vs “Ouvir meu documento”.
+
 ### Autenticação
 
 - [ ] Instalar SDK do Supabase ou NextAuth escolhido.
@@ -82,6 +93,9 @@ receita ou percepção Premium, não entra na sprint atual.
 
 Só implementar quando houver impacto claro em conversão, retenção ou receita:
 
+- [ ] Prévia curta de voz Premium antes de gerar MP3 completo.
+- [ ] Oferta Premium contextual depois do primeiro play.
+- [ ] Modal leve “Gostou da experiência?” após o usuário ouvir conteúdo real.
 - [ ] Persistir perfil de aprendizado no banco.
 - [ ] Sincronizar onboarding entre dispositivos.
 - [ ] Transformar recomendações em ações reais com IA.
