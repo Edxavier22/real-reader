@@ -913,7 +913,7 @@ export function RealReaderApp() {
                 Enviar arquivo
               </p>
               <p className="mt-3 text-2xl font-black">
-                Arraste aqui ou escolha um PDF/imagem.
+                Escolha um PDF ou imagem para ouvir.
               </p>
               <p className="mt-3 text-sm leading-6 text-real-50">
                 O modo rápido é o padrão. OCR completo só roda por intervalo ou
@@ -925,7 +925,7 @@ export function RealReaderApp() {
                 onClick={() => fileInputRef.current?.click()}
                 disabled={isProcessing}
               >
-                {isProcessing ? "Processando..." : "Escolher arquivo"}
+                {isProcessing ? "Processando..." : "Escolher PDF"}
               </button>
             </div>
 
@@ -2661,3 +2661,4 @@ function statusLabel(status: ReturnType<typeof useSpeechReader>["status"]) {
 
   return labels[status];
 }
+

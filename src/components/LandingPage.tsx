@@ -102,7 +102,7 @@ export function LandingPage() {
               href="#reader"
               className="rounded-2xl border border-slate-200 bg-white px-6 py-4 text-center font-black text-ink transition hover:-translate-y-0.5 hover:shadow-md"
             >
-              Abrir workspace
+              
             </a>
           </div>
           <p className="mt-4 text-sm leading-6 text-slate-500">
@@ -119,7 +119,7 @@ export function LandingPage() {
           <input
             ref={inputRef}
             type="file"
-            accept="application/pdf,image/png,image/jpeg,image/webp,image/bmp"
+            accept="application/PDF,image/png,image/jpeg,image/webp,image/bmp"
             className="hidden"
             onChange={handleInputChange}
           />
@@ -128,7 +128,7 @@ export function LandingPage() {
               Comece aqui
             </p>
             <h2 className="mt-4 text-3xl font-black">
-              Solte seu PDF aqui ou escolha um arquivo.
+              Escolha o que deseja ouvir hoje.
             </h2>
             <p className="mt-3 leading-7 text-real-50">
               O app processa no modo rápido primeiro para você ouvir sem esperar
@@ -254,4 +254,5 @@ function LandingSection({
     </section>
   );
 }
+
 
