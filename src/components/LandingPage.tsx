@@ -128,7 +128,7 @@ export function LandingPage() {
               Comece aqui
             </p>
             <h2 className="mt-4 text-3xl font-black">
-              Arraste seu PDF ou escolha um arquivo.
+              Solte seu PDF aqui ou escolha um arquivo.
             </h2>
             <p className="mt-3 leading-7 text-real-50">
               O app processa no modo rápido primeiro para você ouvir sem esperar
@@ -139,7 +139,7 @@ export function LandingPage() {
               className="mt-6 w-full rounded-2xl bg-white px-5 py-4 font-black text-real-700 transition hover:-translate-y-0.5 hover:shadow-lg"
               onClick={() => inputRef.current?.click()}
             >
-              Escolher arquivo
+              Escolher PDF
             </button>
           </div>
           <div className="mt-4 grid gap-2 text-sm font-bold text-slate-600 sm:grid-cols-3">
@@ -254,3 +254,4 @@ function LandingSection({
     </section>
   );
 }
+
