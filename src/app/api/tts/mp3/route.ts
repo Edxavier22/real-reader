@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
-import { resolveServerAccess } from "@/lib/commercial/auth";
+import { recordUsage, resolveServerAccess } from "@/lib/commercial/auth";
+import {
+  checkRateLimit,
+  getRequestIdentity
+} from "@/lib/commercial/rate-limit";
 import type { VoiceMode } from "@/lib/reader/types";
 import {
   createAudioCacheKey,
@@ -21,6 +25,19 @@ type Mp3RequestBody = {
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
+  const rate = checkRateLimit({
+    key: `tts-mp3:${getRequestIdentity(request)}`,
+    limit: 15,
+    windowMs: 60_000
+  });
+
+  if (!rate.allowed) {
+    return NextResponse.json(
+      { error: "Muitas gerações em sequência. Aguarde um minuto." },
+      { status: 429 }
+    );
+  }
+
   let body: Mp3RequestBody;
 
   try {
@@ -74,9 +91,13 @@ async function generateNeuralMp3(
   title?: string,
   voiceProfileId?: string
 ) {
-  const access = resolveServerAccess(request);
+  const access = await resolveServerAccess(request);
 
-  if (!access.plan.features.mp3 || !access.plan.features.neuralVoice) {
+  if (
+    !access.isAuthenticated ||
+    !access.plan.features.mp3 ||
+    !access.plan.features.neuralVoice
+  ) {
     return NextResponse.json(
       {
         error: "MP3 com voz neural é um recurso Premium.",
@@ -95,6 +116,20 @@ async function generateNeuralMp3(
         )} caracteres por geração.`
       },
       { status: 413 }
+    );
+  }
+
+  if (
+    access.usage &&
+    access.usage.voice_characters + text.length > access.plan.monthlyNeuralChars
+  ) {
+    return NextResponse.json(
+      {
+        error: "Limite mensal de voz neural atingido.",
+        details:
+          "Seu limite mensal de caracteres foi consumido. Aguarde a renovação do ciclo."
+      },
+      { status: 402 }
     );
   }
 
@@ -140,6 +175,13 @@ async function generateNeuralMp3(
       voiceId: result.voiceId
     });
 
+    if (access.userId) {
+      await recordUsage(access.userId, {
+        voice_characters: result.characterCount,
+        mp3_generations: 1
+      });
+    }
+
     return audioResponse(result.audio, {
       title,
       contentType: result.contentType,
@@ -151,7 +193,8 @@ async function generateNeuralMp3(
     return NextResponse.json(
       {
         error: "Falha ao gerar MP3 neural.",
-        details: error instanceof Error ? error.message : "Erro desconhecido."
+        details: error instanceof Error ? error.message : "Erro desconhecido.",
+        fallbackVoiceMode: "browser"
       },
       { status: 502 }
     );

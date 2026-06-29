@@ -1,4 +1,6 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
+import { BillingPortalButton } from "@/components/BillingPortalButton";
 import { CheckoutButton } from "@/components/CheckoutButton";
 import { commercialPlans } from "@/lib/commercial/plans";
 
@@ -15,6 +17,10 @@ export default function PricingPage() {
         <h1 className="mt-3 text-5xl font-black tracking-tight text-ink">
           Comece grátis. Assine quando precisar estudar pesado.
         </h1>
+        <p className="mt-4 text-lg leading-8 text-slate-700">
+          O Free ajuda você a experimentar. O Premium libera voz neural, MP3,
+          OCR completo, blocos e continuidade de estudo vinculada à sua conta.
+        </p>
       </header>
 
       <section className="mt-10 grid gap-6 lg:grid-cols-2">
@@ -50,17 +56,28 @@ export default function PricingPage() {
             "OCR completo por intervalo/bloco",
             "Salvar onde parou",
             "Baixar TXT por bloco",
-            "Voz neural e MP3 quando as chaves estiverem configuradas"
+            "Voz neural e MP3 com ElevenLabs configurado"
           ]}
           action={<CheckoutButton />}
         />
       </section>
 
       <p className="mt-6 rounded-2xl bg-amber-50 p-4 text-sm leading-6 text-amber-900">
-        O botão Premium usa Stripe Checkout. Se `STRIPE_SECRET_KEY` e
-        `STRIPE_PRICE_ID` ainda não estiverem configurados, a tela informa isso
-        em vez de simular pagamento.
+        Para assinar, entre na sua conta. Após o pagamento, o webhook do Stripe
+        libera Premium automaticamente. Se as chaves ainda não estiverem
+        configuradas, o sistema informa isso em vez de simular compra.
       </p>
+
+      <section className="mt-6 rounded-3xl border border-slate-200 bg-white/80 p-5">
+        <h2 className="text-xl font-black text-ink">Já é assinante?</h2>
+        <p className="mt-2 text-sm leading-6 text-slate-600">
+          Gerencie cancelamento, renovação e dados de cobrança pelo portal seguro
+          do Stripe.
+        </p>
+        <div className="mt-4 max-w-sm">
+          <BillingPortalButton />
+        </div>
+      </section>
     </main>
   );
 }
@@ -77,7 +94,7 @@ function PlanCard({
   badge: string;
   price: string;
   features: string[];
-  action: React.ReactNode;
+  action: ReactNode;
   featured?: boolean;
 }) {
   return (

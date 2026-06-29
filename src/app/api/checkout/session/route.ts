@@ -1,17 +1,45 @@
 import { NextResponse } from "next/server";
+import { requireAuthenticatedAccess } from "@/lib/commercial/auth";
+import {
+  checkRateLimit,
+  getRequestIdentity
+} from "@/lib/commercial/rate-limit";
+import { stripeApiRequest } from "@/lib/commercial/stripe";
+
+type CheckoutResponse = {
+  id: string;
+  url?: string;
+};
 
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
-  const secretKey = process.env.STRIPE_SECRET_KEY;
+  const rate = checkRateLimit({
+    key: `checkout:${getRequestIdentity(request)}`,
+    limit: 10,
+    windowMs: 60_000
+  });
+
+  if (!rate.allowed) {
+    return NextResponse.json(
+      { error: "Muitas tentativas. Aguarde um minuto e tente novamente." },
+      { status: 429 }
+    );
+  }
+
+  const { access, response } = await requireAuthenticatedAccess(request);
+
+  if (response) {
+    return response;
+  }
+
   const priceId = process.env.STRIPE_PRICE_ID;
 
-  if (!secretKey || !priceId) {
+  if (!priceId) {
     return NextResponse.json(
       {
         error: "Stripe Checkout ainda não configurado.",
-        details:
-          "Configure STRIPE_SECRET_KEY e STRIPE_PRICE_ID no servidor/Vercel."
+        details: "Configure STRIPE_PRICE_ID no servidor/Vercel."
       },
       { status: 503 }
     );
@@ -26,31 +54,46 @@ export async function POST(request: Request) {
   params.set("line_items[0][price]", priceId);
   params.set("line_items[0][quantity]", "1");
   params.set("allow_promotion_codes", "true");
-  params.set("success_url", `${origin}/checkout/success?session_id={CHECKOUT_SESSION_ID}`);
+  params.set("client_reference_id", access.userId ?? "");
+  params.set("customer_email", access.user?.email ?? "");
+  params.set("metadata[userId]", access.userId ?? "");
+  params.set("subscription_data[metadata][userId]", access.userId ?? "");
+  params.set(
+    "success_url",
+    `${origin}/checkout/success?session_id={CHECKOUT_SESSION_ID}`
+  );
   params.set("cancel_url", `${origin}/checkout/cancel`);
 
-  const response = await fetch("https://api.stripe.com/v1/checkout/sessions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${secretKey}`,
-      "Content-Type": "application/x-www-form-urlencoded"
-    },
-    body: params.toString()
-  });
+  try {
+    const data = await stripeApiRequest<CheckoutResponse>("checkout/sessions", {
+      method: "POST",
+      body: params.toString()
+    });
 
-  const data = (await response.json().catch(() => null)) as
-    | { url?: string; error?: { message?: string } }
-    | null;
+    if (!data.url) {
+      throw new Error("Stripe não retornou a URL de checkout.");
+    }
 
-  if (!response.ok || !data?.url) {
+    return NextResponse.json({ url: data.url });
+  } catch (error) {
     return NextResponse.json(
       {
         error: "Não foi possível criar a sessão do Stripe.",
-        details: data?.error?.message ?? "Sem detalhes retornados pelo Stripe."
+        details:
+          error instanceof Error
+            ? error.message
+            : "Sem detalhes retornados pelo Stripe."
       },
-      { status: response.status || 500 }
+      { status: getErrorStatus(error) }
     );
   }
+}
 
-  return NextResponse.json({ url: data.url });
+function getErrorStatus(error: unknown) {
+  return typeof error === "object" &&
+    error !== null &&
+    "status" in error &&
+    typeof error.status === "number"
+    ? error.status
+    : 500;
 }

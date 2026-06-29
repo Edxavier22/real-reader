@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRef, type ChangeEvent, type DragEvent } from "react";
+import { useRef, useState, type ChangeEvent, type DragEvent } from "react";
 
 const steps = [
   {
@@ -46,6 +46,7 @@ const faqs = [
 
 export function LandingPage() {
   const inputRef = useRef<HTMLInputElement>(null);
+  const [isDraggingFile, setIsDraggingFile] = useState(false);
 
   const sendFileToWorkspace = (file?: File) => {
     if (!file) {
@@ -73,7 +74,21 @@ export function LandingPage() {
 
   const handleDrop = (event: DragEvent<HTMLDivElement>) => {
     event.preventDefault();
+    setIsDraggingFile(false);
     sendFileToWorkspace(event.dataTransfer.files?.[0]);
+  };
+
+  const handleDragOver = (event: DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    setIsDraggingFile(true);
+  };
+
+  const handleDragLeave = (event: DragEvent<HTMLDivElement>) => {
+    if (event.currentTarget.contains(event.relatedTarget as Node | null)) {
+      return;
+    }
+
+    setIsDraggingFile(false);
   };
 
   return (
@@ -102,7 +117,7 @@ export function LandingPage() {
               href="#reader"
               className="rounded-2xl border border-slate-200 bg-white px-6 py-4 text-center font-black text-ink transition hover:-translate-y-0.5 hover:shadow-md"
             >
-              
+              Abrir workspace
             </a>
           </div>
           <p className="mt-4 text-sm leading-6 text-slate-500">
@@ -112,23 +127,40 @@ export function LandingPage() {
         </div>
 
         <div
-          className="rounded-[2rem] border-2 border-dashed border-real-200 bg-white/90 p-5 shadow-soft backdrop-blur"
-          onDragOver={(event) => event.preventDefault()}
+          className={[
+            "rounded-[2rem] border-2 border-dashed p-5 shadow-soft backdrop-blur transition-all duration-300",
+            isDraggingFile
+              ? "scale-[1.01] border-real-500 bg-real-50 shadow-lg"
+              : "border-real-200 bg-white/90 hover:border-real-300"
+          ].join(" ")}
+          onDragEnter={handleDragOver}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
           onDrop={handleDrop}
         >
           <input
             ref={inputRef}
             type="file"
-            accept="application/PDF,image/png,image/jpeg,image/webp,image/bmp"
+            accept="application/pdf,image/png,image/jpeg,image/webp,image/bmp"
             className="hidden"
             onChange={handleInputChange}
           />
-          <div className="rounded-[1.5rem] bg-gradient-to-br from-real-600 to-real-950 p-6 text-white">
+          <div
+            className={[
+              "rounded-[1.5rem] bg-gradient-to-br from-real-600 to-real-950 p-6 text-white transition-all duration-300",
+              isDraggingFile ? "animate-pulse" : ""
+            ].join(" ")}
+          >
+            <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-white/15 text-3xl">
+              {isDraggingFile ? "⬇" : "📄"}
+            </div>
             <p className="text-sm font-semibold uppercase tracking-[0.2em] text-real-100">
               Comece aqui
             </p>
             <h2 className="mt-4 text-3xl font-black">
-              Escolha o que deseja ouvir hoje.
+              {isDraggingFile
+                ? "Solte o arquivo para ouvir."
+                : "Escolha o que deseja ouvir hoje."}
             </h2>
             <p className="mt-3 leading-7 text-real-50">
               O app processa no modo rápido primeiro para você ouvir sem esperar
@@ -139,7 +171,7 @@ export function LandingPage() {
               className="mt-6 w-full rounded-2xl bg-white px-5 py-4 font-black text-real-700 transition hover:-translate-y-0.5 hover:shadow-lg"
               onClick={() => inputRef.current?.click()}
             >
-              Escolher PDF
+              Escolher arquivo
             </button>
           </div>
           <div className="mt-4 grid gap-2 text-sm font-bold text-slate-600 sm:grid-cols-3">
@@ -225,6 +257,15 @@ export function LandingPage() {
             </Link>
             <Link href="/roadmap" className="font-bold hover:text-real-700">
               Roadmap
+            </Link>
+            <Link href="/termos" className="font-bold hover:text-real-700">
+              Termos
+            </Link>
+            <Link href="/privacidade" className="font-bold hover:text-real-700">
+              Privacidade
+            </Link>
+            <Link href="/suporte" className="font-bold hover:text-real-700">
+              Suporte
             </Link>
           </nav>
         </div>

@@ -71,10 +71,6 @@ export function getPlan(planId?: string | null): CommercialPlan {
   return planId === "premium" ? commercialPlans.premium : commercialPlans.free;
 }
 
-export function getClientConfiguredPlan(): CommercialPlan {
-  return getPlan(process.env.NEXT_PUBLIC_REAL_READER_DEMO_PLAN);
-}
-
 export function formatPlanRestriction(plan: CommercialPlan, feature: string) {
   return `${feature} faz parte do plano PREMIUM. O plano ${plan.name} continua disponível para teste com voz local e limite de ${plan.maxPagesPerPdf} páginas por PDF.`;
 }

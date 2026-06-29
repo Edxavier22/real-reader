@@ -1,137 +1,80 @@
-# TODO Comercial — REAL Reader
+# TODO Comercial — REAL Reader RC1
 
-Este arquivo separa o que realmente aproxima o produto de venda do que deve
-esperar. A regra é simples: se não aumenta aquisição, conversão, retenção,
-receita ou percepção Premium, não entra na sprint atual.
+Este arquivo separa o que falta para vender com segurança do que deve ficar no
+backlog oficial.
 
-## Alta prioridade antes de vender em produção
+## Antes de abrir venda pública
 
-### Funil de primeiro áudio
+- [ ] Executar `database/schema.sql` no Supabase de produção.
+- [ ] Configurar Supabase Auth por e-mail/senha.
+- [ ] Configurar variáveis Supabase na Vercel.
+- [ ] Configurar produto/preço Stripe.
+- [ ] Configurar webhook Stripe `/api/stripe/webhook`.
+- [ ] Configurar `STRIPE_WEBHOOK_SECRET`.
+- [ ] Configurar Stripe Billing Portal.
+- [ ] Configurar ElevenLabs.
+- [ ] Testar login, logout e recuperação de senha.
+- [ ] Testar checkout em modo teste.
+- [ ] Confirmar liberação automática de Premium após webhook.
+- [ ] Confirmar remoção de Premium após cancelamento.
+- [ ] Confirmar bloqueio de MP3/voz neural para Free.
+- [ ] Confirmar MP3 neural para Premium.
+- [ ] Confirmar sincronização de documento/progresso após novo login.
+- [x] Criar Termos de Uso.
+- [x] Criar Política de Privacidade.
+- [x] Criar página de Suporte.
+- [ ] Configurar `NEXT_PUBLIC_SUPPORT_EMAIL` com e-mail real.
 
-- [ ] Registrar evento real `landing_viewed`.
-- [ ] Registrar evento real `hero_upload_started`.
-- [ ] Registrar evento real `document_processed`.
-- [ ] Registrar evento real `first_play`.
-- [ ] Medir tempo entre visita, upload, processamento e primeiro play.
-- [ ] Criar funil Home → Upload → Primeiro Play → Premium.
-- [ ] Testar A/B de headline: “Estude enquanto dirige” vs “Sua apostila agora fala”.
-- [ ] Testar A/B de CTA: “Experimentar grátis” vs “Ouvir meu documento”.
+## Primeiros clientes beta
 
-### Autenticação
+- [ ] Convidar 5 a 20 usuários reais.
+- [ ] Medir tempo até primeiro áudio.
+- [ ] Medir quantos fazem upload.
+- [ ] Medir quantos clicam em Premium.
+- [ ] Medir quantos concluem checkout.
+- [ ] Medir retorno em 24h e 7 dias.
+- [ ] Coletar feedback sobre voz neural.
+- [ ] Coletar feedback sobre OCR em apostilas/slides.
+- [ ] Registrar bugs críticos de login/pagamento.
 
-- [ ] Instalar SDK do Supabase ou NextAuth escolhido.
-- [ ] Implementar login real em `/login`.
-- [ ] Criar sessão server-side.
-- [ ] Remover dependência de `NEXT_PUBLIC_REAL_READER_DEMO_PLAN` em produção.
-- [ ] Vincular usuário autenticado à tabela `users`.
+## Segurança e operação
 
-### Assinaturas
-
-- [ ] Criar webhook Stripe.
-- [ ] Validar assinatura ativa pelo webhook, não pelo cliente.
-- [ ] Salvar `stripe_customer_id` e `stripe_subscription_id`.
-- [ ] Atualizar `subscriptions.status`.
-- [ ] Criar página de gerenciamento/cancelamento de assinatura.
-
-### Limites e custo
-
-- [ ] Registrar páginas processadas.
-- [ ] Registrar páginas com OCR.
-- [ ] Registrar caracteres enviados para voz neural.
-- [ ] Aplicar limite mensal real em `usage_limits`.
-- [ ] Criar mensagens de limite atingido por plano.
-- [ ] Medir custo real por documento, bloco e minuto de áudio.
-
-### Persistência
-
-- [ ] Salvar documentos no banco para usuários logados.
-- [ ] Salvar blocos no banco.
-- [ ] Salvar bookmarks no banco.
-- [ ] Sincronizar histórico local com conta logada.
-- [ ] Criar exclusão de documento/dados pelo usuário.
-
-## Sprint 5 — Backlog direto da experiência de voz
-
-- [ ] Configurar Voice IDs reais para Professor, Professora, Podcast, Calmo,
-      Motivador, Jornalista, Storytelling e Infantil.
-- [ ] Criar prévia curta de voz antes de gerar MP3 completo.
-- [ ] Persistir cache de áudio em storage durável.
-- [ ] Criar política de expiração de cache por plano.
-- [ ] Criar fila/worker para documentos grandes.
-- [ ] Mostrar custo estimado de caracteres antes de gerar áudio longo.
-- [ ] Implementar fallback entre providers quando o principal falhar.
-- [ ] Criar adapters reais para OpenAI TTS, Azure Speech, Google TTS e Amazon Polly.
-- [ ] Criar testes com textos reais de apostilas, slides e concursos.
-
-## Voz neural e MP3
-
-- [ ] Testar ElevenLabs com textos reais e medir custo por caractere.
-- [ ] Permitir MP3 por página/bloco/documento com progresso persistente.
-- [ ] Salvar metadados de geração de áudio.
-- [ ] Adicionar histórico de áudios gerados.
-- [ ] Bloquear geração simultânea abusiva.
-
-## Minha voz autorizada
-
-- [ ] Escolher provider com fluxo completo de consentimento.
-- [ ] Implementar verificação de titularidade.
-- [ ] Registrar aceite de uso.
-- [ ] Permitir revogação e remoção dos dados.
-- [ ] Bloquear tecnicamente uso de voz de terceiros.
-- [ ] Criar trilha de auditoria LGPD.
-
-## Produção
-
-- [ ] Ativar RLS no Supabase.
-- [ ] Configurar domínio.
-- [ ] Revisar política de privacidade e termos de uso.
+- [ ] Revisar políticas RLS no Supabase de produção.
+- [ ] Criar rotina de exclusão/exportação de dados.
 - [ ] Criar página de suporte.
-- [ ] Criar monitoramento de erros e custos.
-- [ ] Fazer teste ponta a ponta em ambiente de staging.
+- [ ] Adicionar monitoramento de erro.
+- [ ] Adicionar logs persistentes de eventos críticos.
+- [ ] Trocar rate limit em memória por solução persistente.
+- [ ] Monitorar custo ElevenLabs por usuário.
+- [ ] Definir política de reembolso/cancelamento.
 
-## Backlog orientado a pagamento
+## Retenção
 
-Só implementar quando houver impacto claro em conversão, retenção ou receita:
+- [ ] Melhorar painel de conta.
+- [ ] Mostrar uso mensal de caracteres/MP3.
+- [ ] Criar e-mails simples de ativação e retorno.
+- [ ] Criar aviso contextual após primeiro play: “Quer voz humana e MP3?”
+- [ ] Melhorar continuidade entre dispositivos.
+- [ ] Salvar metadados dos MP3 gerados.
+- [ ] Evoluir cache de áudio para storage durável.
 
-- [ ] Prévia curta de voz Premium antes de gerar MP3 completo.
-- [ ] Oferta Premium contextual depois do primeiro play.
-- [ ] Modal leve “Gostou da experiência?” após o usuário ouvir conteúdo real.
-- [ ] Persistir perfil de aprendizado no banco.
-- [ ] Sincronizar onboarding entre dispositivos.
-- [ ] Transformar recomendações em ações reais com IA.
-- [ ] Conectar analytics local a PostHog, Plausible, Segment ou ferramenta escolhida.
-- [ ] Importação Word, PowerPoint, EPUB, HTML e páginas web.
-- [ ] YouTube, áudio e vídeo.
-- [ ] Biblioteca persistente e coleções.
-- [ ] Playlist e fila de documentos.
-- [ ] Player mobile estilo Spotify.
-- [ ] Modo carro, caminhada, academia e escuro.
-- [ ] Professor Virtual e chat sobre documento.
-- [ ] Empresas: universidades, cursos, escolas, treinamentos corporativos e EAD.
-- [ ] Programa de indicação e métricas de LTV/churn.
+## Backlog protegido
 
-## Itens proibidos na Sprint 5
+Não implementar no RC1:
 
-Mantidos fora para preservar foco no “UAU” da voz Premium:
-
-- [ ] Dashboard novo.
-- [ ] Quiz.
-- [ ] Flashcards.
-- [ ] Professor IA.
 - [ ] Chat IA.
-- [ ] Gamificação.
-- [ ] Empresas.
+- [ ] Professor IA.
 - [ ] Resumos IA.
+- [ ] Flashcards.
+- [ ] Quiz.
 - [ ] Mapas mentais.
-- [ ] Biblioteca persistente.
-- [ ] Mobile avançado.
+- [ ] Vetorização.
+- [ ] DOCX, PPTX, EPUB, HTML, Markdown e ZIP.
+- [ ] YouTube, áudio e vídeo.
+- [ ] Empresas/B2B.
+- [ ] Gamificação.
+- [ ] Mobile avançado/PWA.
+- [ ] Minha Voz com clonagem ativa.
 
-## Icebox
-
-Ideias úteis, mas fora do ciclo comercial atual:
-
-- [ ] Avatares animados.
-- [ ] Ranking público entre usuários.
-- [ ] Marketplace de vozes.
-- [ ] Comunidade/social feed.
-- [ ] Editor completo de documentos.
+Esses itens só entram depois que o produto estiver vendendo e as métricas
+mostrarem onde está o maior gargalo.

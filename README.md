@@ -8,126 +8,46 @@ ficar preso à tela.
 > Transforme qualquer conteúdo em uma experiência de aprendizado narrada por
 > Inteligência Artificial.
 
-## Sprint — UX, Conversão e Primeiro Áudio
+## RC1 — Produto Vendável
 
-Objetivo da Sprint: reduzir o caminho entre entrar no site e ouvir o primeiro
-documento.
+Objetivo do RC1: permitir que um novo usuário crie conta, assine o Premium,
+tenha o plano liberado automaticamente e retome seus estudos depois de sair e
+voltar.
 
-Mudanças entregues:
+O que foi fechado nesta etapa:
 
-- Home encurtada para Hero, upload, 3 passos, Premium compacto, FAQ e rodapé.
-- Upload no Hero: escolher ou arrastar arquivo já envia o arquivo para o workspace.
-- Workspace reposicionado como app de estudo, não apresentação institucional.
-- Onboarding deixou de bloquear a experiência e virou personalização opcional.
-- Ação principal ficou clara: **Adicionar conteúdo**.
-- Conteúdos longos saíram da Home e foram para páginas próprias:
-  - `/vozes`
-  - `/ia-estudos`
-  - `/dashboard`
-  - `/analytics`
-  - `/minha-voz`
-  - `/roadmap`
-  - `/biblioteca-futura`
-  - `/metricas`
-  - `/depoimentos`
+- cadastro, login, logout, recuperação de senha e persistência de sessão via
+  Supabase Auth;
+- plano resolvido no servidor, não por variável pública;
+- checkout Stripe autenticado;
+- webhook Stripe com assinatura verificada;
+- assinatura Premium persistida no banco;
+- portal Stripe para cancelamento/gestão de cobrança;
+- endpoints Premium protegidos no servidor;
+- uso mensal de voz neural/MP3 registrado;
+- documentos, favoritos, blocos, progresso e preferências sincronizados para
+  usuários logados;
+- fallback local quando voz neural não está configurada ou falha;
+- schema Supabase com índices, preferências, conteúdo sincronizado e RLS.
 
-Métrica de sucesso desta Sprint:
+## O que funciona
 
-> O usuário deve conseguir entrar, enviar um documento e chegar ao primeiro play
-> em menos de um minuto.
-
-## Sprint 5 — Efeito UAU
-
-Objetivo da Sprint: atacar o maior gargalo comercial do produto — a sensação de
-voz robótica — e fazer a experiência Premium parecer um produto profissional.
-
-Entregue nesta Sprint:
-
-- arquitetura desacoplada de provedores de voz;
-- biblioteca profissional de vozes Premium;
-- player Premium com sensação de app de áudio;
-- continuação inteligente para o usuário voltar direto de onde parou;
-- cache de áudio neural no servidor para evitar regeração desnecessária;
-- fluxo profissional de “Minha Voz” sem clonagem ativa;
-- documentação clara sobre o que funciona e o que depende de API externa.
-
-## O que funciona agora
-
-- Landing page curta, orientada a upload e primeiro áudio.
-- Upload direto no Hero com envio do arquivo para o workspace.
-- Páginas específicas para vozes, IA de estudos, analytics, roadmap, biblioteca
-  futura, métricas e depoimentos.
-- Plano **FREE** com experimentação e limite de até 10 páginas por documento.
-- Plano **PREMIUM** preparado para até 300 páginas por documento.
+- Landing curta com upload direto.
 - Upload local de PDF e imagens (`PNG`, `JPG`, `WEBP`, `BMP`).
-- Modo rápido como padrão.
-- OCR completo apenas por intervalo ou bloco no Premium.
-- Separação de texto por páginas.
+- Extração de texto selecionável em PDF.
+- OCR rápido quando a página não tem texto útil.
+- OCR completo por intervalo/bloco no Premium.
+- Texto separado por páginas.
 - Leitura local com voz do navegador.
-- Controle de play, pausa, página anterior, próxima página e velocidade.
+- Player com play, pausa, página anterior/próxima, velocidade e estimativas.
 - Blocos/módulos de estudo no Premium.
-- Marcador para salvar onde parou.
-- Histórico local limitado por plano.
+- Salvar e continuar de onde parou.
+- Histórico local para visitantes.
+- Sincronização em nuvem para usuários logados.
 - Download `.TXT` do documento inteiro e do bloco selecionado.
-- Botão **Limpar texto** para reduzir ruído de OCR.
-- Endpoint seguro `/api/tts/neural` para voz neural no servidor.
-- Endpoint `/api/tts/mp3` para gerar áudio neural quando o plano e a API estiverem configurados.
-- Página `/minha-voz` com consentimento e regras de uso responsável.
-- Schema SQL em `database/schema.sql`.
-
-## Voz neural e biblioteca de vozes
-
-A Sprint 5 criou uma arquitetura de provedores:
-
-- `browser`: voz local gratuita do navegador;
-- `elevenlabs`: provider neural implementado no servidor;
-- `openai`: provider preparado para adapter futuro;
-- `azure`: provider preparado para adapter futuro;
-- `google`: provider preparado para adapter futuro;
-- `polly`: provider preparado para adapter futuro.
-
-A biblioteca de vozes Premium foi preparada com:
-
-- Professor
-- Professora
-- Narrador
-- Podcast
-- Calmo
-- Motivador
-- Jornalista
-- Storytelling
-- Infantil
-- Minha Voz
-
-Cada voz possui nome, descrição, idioma, gênero, categoria, provider, qualidade,
-tipo de plano e disponibilidade. A interface mostra quando a voz está disponível,
-quando falta configurar uma chave ou quando a voz ainda depende de provider futuro.
-
-Importante: o app não finge voz neural. Se a API não estiver configurada, o usuário
-vê um aviso claro.
-
-## Player Premium
-
-O player foi evoluído para transmitir mais valor percebido:
-
-- barra de progresso;
-- tempo total estimado;
-- tempo restante estimado;
-- página atual;
-- capítulo anterior e próximo;
-- play/pause;
-- velocidade;
-- indicação visual da voz selecionada;
-- preparação para playlist futura.
-
-## Cache de áudio
-
-A geração neural usa cache em memória no servidor para evitar gerar novamente o
-mesmo áudio com o mesmo provider, voz e texto. Isso reduz custo, espera e chamadas
-desnecessárias.
-
-Na produção, o próximo passo é trocar o cache em memória por armazenamento durável
-com expiração e controle por usuário.
+- MP3 com voz neural Premium quando ElevenLabs estiver configurado.
+- Biblioteca de vozes Premium com disponibilidade real por provider.
+- Minha Voz preparada com consentimento, sem clonagem ativa.
 
 ## Planos
 
@@ -135,18 +55,14 @@ com expiração e controle por usuário.
 | --- | --- | --- |
 | Páginas por documento | até 10 | até 300 |
 | Voz local do navegador | sim | sim |
-| Histórico | limitado | avançado |
+| Histórico | local limitado | sincronizado |
 | Blocos/módulos | não | sim |
 | OCR completo | não | por intervalo/bloco |
 | Salvar onde parou | não | sim |
 | TXT por bloco | não | sim |
-| Voz neural | não | sim, se provider estiver configurado |
-| MP3 | não | página/bloco/documento, se provider estiver configurado |
+| Voz neural | não | sim, com ElevenLabs configurado |
+| MP3 | não | página/bloco/documento |
 | Minha Voz | não | arquitetura preparada, sem clonagem ativa |
-
-Antes de Supabase/Stripe estarem ligados de verdade, o plano exibido no cliente
-vem de `NEXT_PUBLIC_REAL_READER_DEMO_PLAN`. Em produção, isso deve ser substituído
-pelo plano salvo no banco e validado no servidor.
 
 ## Variáveis de ambiente
 
@@ -156,15 +72,22 @@ Copie:
 Copy-Item .env.example .env.local
 ```
 
-Principais variáveis:
+Configure:
 
 ```env
-NEXT_PUBLIC_REAL_READER_DEMO_PLAN=free
 NEXT_PUBLIC_APP_URL=http://localhost:3000
+NEXT_PUBLIC_SUPPORT_EMAIL=
+
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
+
+STRIPE_SECRET_KEY=
+STRIPE_PRICE_ID=
+STRIPE_WEBHOOK_SECRET=
 
 SPEECH_PROVIDER=elevenlabs
 TTS_PROVIDER=browser
-TTS_API_KEY=
 
 ELEVENLABS_API_KEY=
 ELEVENLABS_VOICE_ID=
@@ -180,55 +103,68 @@ ELEVENLABS_VOICE_JORNALISTA_ID=
 ELEVENLABS_VOICE_STORYTELLING_ID=
 ELEVENLABS_VOICE_INFANTIL_ID=
 
-OPENAI_API_KEY=
-AZURE_SPEECH_KEY=
-GOOGLE_TTS_API_KEY=
-AWS_ACCESS_KEY_ID=
-AWS_SECRET_ACCESS_KEY=
-
 AUTHORIZED_VOICE_ID=
-
-STRIPE_SECRET_KEY=
-STRIPE_PRICE_ID=
-
-NEXT_PUBLIC_SUPABASE_URL=
-NEXT_PUBLIC_SUPABASE_ANON_KEY=
-SUPABASE_SERVICE_ROLE_KEY=
 ```
 
-Nunca exponha `ELEVENLABS_API_KEY`, `STRIPE_SECRET_KEY` ou
-`SUPABASE_SERVICE_ROLE_KEY` no navegador.
+Nunca exponha no navegador:
 
-## Minha voz autorizada
-
-Não há clonagem ativa na Sprint 5.
-
-O fluxo preparado é:
-
-1. consentimento;
-2. upload de gravações;
-3. validação de titularidade;
-4. treinamento;
-5. geração/registro de `voiceId`;
-6. remoção sob solicitação;
-7. conformidade LGPD.
-
-Regra: jamais permitir voz de terceiros. A voz só pode ser usada com consentimento
-explícito do dono da voz.
+- `SUPABASE_SERVICE_ROLE_KEY`;
+- `STRIPE_SECRET_KEY`;
+- `STRIPE_WEBHOOK_SECRET`;
+- `ELEVENLABS_API_KEY`.
 
 ## Banco de dados
 
-O arquivo `database/schema.sql` prepara:
+1. Crie um projeto Supabase.
+2. Abra o SQL Editor.
+3. Execute `database/schema.sql`.
+4. Confirme que RLS está ativo nas tabelas.
+5. Configure Supabase Auth com e-mail/senha.
+
+Tabelas principais:
 
 - `users`
 - `subscriptions`
+- `user_preferences`
 - `documents`
 - `study_blocks`
 - `reading_bookmarks`
 - `usage_limits`
+- `security_events`
 
-Antes de produção, aplique RLS, webhooks do Stripe e vínculo real entre sessão,
-assinatura e limites.
+## Stripe
+
+1. Crie produto e preço recorrente.
+2. Defina `STRIPE_PRICE_ID`.
+3. Defina `STRIPE_SECRET_KEY`.
+4. Crie webhook apontando para:
+
+```text
+https://SEU-DOMINIO/api/stripe/webhook
+```
+
+5. Eventos recomendados:
+
+- `checkout.session.completed`
+- `customer.subscription.created`
+- `customer.subscription.updated`
+- `customer.subscription.deleted`
+- `invoice.payment_succeeded`
+- `invoice.payment_failed`
+
+6. Defina `STRIPE_WEBHOOK_SECRET`.
+7. Configure o Stripe Billing Portal para permitir cancelamento/gestão.
+
+## ElevenLabs
+
+Para voz neural/MP3:
+
+1. Configure `ELEVENLABS_API_KEY`.
+2. Configure `ELEVENLABS_VOICE_ID`.
+3. Opcionalmente configure Voice IDs específicos da biblioteca.
+
+Se ElevenLabs não estiver configurado, o app não finge voz neural. O usuário
+continua com a voz local gratuita do navegador.
 
 ## Como rodar
 
@@ -250,36 +186,32 @@ pnpm typecheck
 pnpm build
 ```
 
-## O que depende de configuração externa
+## Checklist comercial antes de vender
 
-- Voz neural real depende de `ELEVENLABS_API_KEY`.
-- Vozes específicas dependem dos respectivos `ELEVENLABS_VOICE_*_ID`.
-- Checkout real depende de Stripe.
-- Login real e assinatura real dependem de Supabase/Auth e webhooks.
-- “Minha Voz” depende de provider com fluxo completo de consentimento, validação
-  e remoção.
+- [ ] Supabase configurado em produção.
+- [ ] `database/schema.sql` executado.
+- [ ] Stripe Checkout em modo teste validado.
+- [ ] Webhook Stripe recebendo eventos.
+- [ ] Assinatura Premium gravando em `subscriptions`.
+- [ ] Login, logout e recuperação testados.
+- [ ] Usuário Premium conseguindo gerar MP3 neural.
+- [ ] Usuário Free bloqueado nos endpoints Premium.
+- [ ] Documento/progresso/favorito sincronizando após novo login.
+- [ ] Termos de uso, privacidade e suporte publicados.
+- [ ] `NEXT_PUBLIC_SUPPORT_EMAIL` configurado com e-mail real.
 
-## O que ficou fora da Sprint 5
+## Backlog protegido
 
-Ficaram no backlog por não resolverem diretamente o gargalo do “UAU” da voz:
+Não entram no RC1:
 
-- Dashboard novo;
+- Chat IA;
+- Professor IA;
 - Quiz;
 - Flashcards;
-- Professor IA;
-- Chat IA;
-- Gamificação;
-- Empresas;
-- Resumos IA;
 - Mapas mentais;
-- Biblioteca persistente;
-- Mobile avançado.
+- novos formatos de arquivo;
+- empresas/B2B;
+- gamificação.
 
-## Regra de produto
-
-Toda nova funcionalidade deve responder “sim” à pergunta:
-
-> Isso aumenta significativamente a chance de alguém pagar pelo REAL Reader?
-
-Se não aumentar conversão, retenção, receita ou percepção Premium, entra no
-backlog em vez de ser implementada agora.
+Esses itens permanecem no backlog oficial até que o produto esteja vendendo e
+medindo conversão/retenção.

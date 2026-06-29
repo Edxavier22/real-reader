@@ -12,6 +12,7 @@ import {
 import { requestMp3Generation } from "@/lib/reader/audio";
 import {
   clearHistory,
+  removeDocumentFromHistory,
   readHistory,
   saveDocumentToHistory
 } from "@/lib/reader/history";
@@ -29,9 +30,11 @@ import {
 } from "@/lib/reader/text";
 import {
   formatPlanRestriction,
-  getClientConfiguredPlan
+  getPlan,
+  type CommercialPlan
 } from "@/lib/commercial/plans";
 import { LearningWorkspace } from "@/components/LearningWorkspace";
+import { LogoutButton } from "@/components/LogoutButton";
 import { trackProductEvent } from "@/lib/product/analytics";
 import type {
   ExtractionMode,
@@ -58,7 +61,26 @@ const initialProgress: ProcessingProgress = {
   message: "Aguardando arquivo."
 };
 
+const FAVORITES_KEY = "real-reader:favorites:v1";
+const MAX_LOCAL_UPLOAD_BYTES = 80 * 1024 * 1024;
+
 type ActiveTab = "reader" | "split";
+
+type AccountStatus = {
+  authenticated: boolean;
+  user: {
+    id: string;
+    email: string;
+    fullName: string | null;
+  } | null;
+  plan: CommercialPlan;
+  preferences: {
+    voice_mode: VoiceMode;
+    voice_profile_id: string;
+    speech_rate: number;
+  } | null;
+  reason: string;
+};
 
 export function RealReaderApp() {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -71,6 +93,7 @@ export function RealReaderApp() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [canCancelProcessing, setCanCancelProcessing] = useState(false);
   const [cancelRequested, setCancelRequested] = useState(false);
+  const [isDraggingFile, setIsDraggingFile] = useState(false);
   const [error, setError] = useState("");
   const [mp3Message, setMp3Message] = useState("");
   const [voiceMessage, setVoiceMessage] = useState("");
@@ -89,7 +112,14 @@ export function RealReaderApp() {
   const [blockStartPage, setBlockStartPage] = useState(1);
   const [blockEndPage, setBlockEndPage] = useState(20);
   const [selectedBlockId, setSelectedBlockId] = useState("");
-  const currentPlan = useMemo(() => getClientConfiguredPlan(), []);
+  const [favoriteDocumentIds, setFavoriteDocumentIds] = useState<string[]>([]);
+  const [currentPlan, setCurrentPlan] = useState<CommercialPlan>(() =>
+    getPlan("free")
+  );
+  const [account, setAccount] = useState<AccountStatus | null>(null);
+  const [accountMessage, setAccountMessage] = useState(
+    "Verificando sua conta..."
+  );
   const isPremiumPlan = currentPlan.id === "premium";
 
   const pages = document?.pages ?? [];
@@ -117,7 +147,87 @@ export function RealReaderApp() {
 
   useEffect(() => {
     setHistory(readHistory());
+
+    try {
+      const rawFavorites = window.localStorage.getItem(FAVORITES_KEY);
+      setFavoriteDocumentIds(rawFavorites ? (JSON.parse(rawFavorites) as string[]) : []);
+    } catch {
+      setFavoriteDocumentIds([]);
+    }
   }, []);
+
+  useEffect(() => {
+    let active = true;
+
+    const loadAccount = async () => {
+      try {
+        const response = await fetch("/api/account", {
+          cache: "no-store"
+        });
+        const data = (await response.json()) as AccountStatus;
+
+        if (!active) {
+          return;
+        }
+
+        setAccount(data);
+        setCurrentPlan(data.plan ?? getPlan("free"));
+        setAccountMessage(
+          data.authenticated && data.user
+            ? `Conectado como ${data.user.email}`
+            : "Teste grátis local. Entre para salvar e liberar Premium."
+        );
+
+        if (data.preferences) {
+          setVoiceMode(data.preferences.voice_mode);
+          setSelectedVoiceProfileId(data.preferences.voice_profile_id);
+          speech.setRate(data.preferences.speech_rate);
+        }
+
+        if (!data.authenticated) {
+          return;
+        }
+
+        const documentsResponse = await fetch("/api/documents", {
+          cache: "no-store"
+        });
+
+        if (!documentsResponse.ok) {
+          return;
+        }
+
+        const documentsData = (await documentsResponse.json()) as {
+          documents?: HistoryRecord[];
+          favorites?: string[];
+        };
+        const cloudDocuments = documentsData.documents ?? [];
+
+        if (!active) {
+          return;
+        }
+
+        setHistory((current) =>
+          mergeHistoryRecords(cloudDocuments, current.length ? current : readHistory())
+        );
+        setFavoriteDocumentIds((current) =>
+          mergeUniqueIds(documentsData.favorites ?? [], current)
+        );
+        setDocument((current) => current ?? cloudDocuments[0] ?? null);
+      } catch {
+        if (active) {
+          setAccountMessage(
+            "Não foi possível verificar a conta agora. O modo local continua disponível."
+          );
+        }
+      }
+    };
+
+    void loadAccount();
+
+    return () => {
+      active = false;
+    };
+  }, [speech.setRate]);
 
   useEffect(() => {
     speech.setCurrentPageIndex(selectedPageIndex);
@@ -128,6 +238,49 @@ export function RealReaderApp() {
       setSelectedPageIndex(speech.currentPageIndex);
     }
   }, [speech.currentPageIndex, speech.status]);
+
+  useEffect(() => {
+    if (
+      !document ||
+      !currentPlan.features.bookmarks ||
+      !pages.length ||
+      (speech.status !== "playing" && speech.status !== "paused")
+    ) {
+      return;
+    }
+
+    const activePage = pages[speech.currentPageIndex] ?? pages[0];
+    const timeout = window.setTimeout(() => {
+      const nextDocument: ReaderDocument = {
+        ...document,
+        lastRead: {
+          pageNumber: activePage.pageNumber,
+          savedAt: new Date().toISOString()
+        }
+      };
+
+      setDocument(nextDocument);
+      setHistory(saveDocumentToHistory(nextDocument, currentPlan.historyLimit));
+
+      if (account?.authenticated) {
+        void syncDocumentToCloud(
+          nextDocument,
+          favoriteDocumentIds.includes(nextDocument.id)
+        );
+      }
+    }, 1500);
+
+    return () => window.clearTimeout(timeout);
+  }, [
+    account?.authenticated,
+    currentPlan.features.bookmarks,
+    currentPlan.historyLimit,
+    document?.id,
+    favoriteDocumentIds,
+    pages,
+    speech.currentPageIndex,
+    speech.status
+  ]);
 
   useEffect(() => {
     if (!document) {
@@ -175,6 +328,33 @@ export function RealReaderApp() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!account?.authenticated) {
+      return;
+    }
+
+    const timeout = window.setTimeout(() => {
+      void fetch("/api/account", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          voiceMode,
+          voiceProfileId: selectedVoiceProfileId,
+          speechRate: speech.rate
+        })
+      }).catch(() => null);
+    }, 800);
+
+    return () => window.clearTimeout(timeout);
+  }, [
+    account?.authenticated,
+    selectedVoiceProfileId,
+    speech.rate,
+    voiceMode
+  ]);
+
   const summary = useMemo(() => {
     if (!document) {
       return null;
@@ -205,8 +385,15 @@ export function RealReaderApp() {
     (nextDocument: ReaderDocument) => {
       setDocument(nextDocument);
       setHistory(saveDocumentToHistory(nextDocument, currentPlan.historyLimit));
+
+      if (account?.authenticated) {
+        void syncDocumentToCloud(
+          nextDocument,
+          favoriteDocumentIds.includes(nextDocument.id)
+        );
+      }
     },
-    [currentPlan.historyLimit]
+    [account?.authenticated, currentPlan.historyLimit, favoriteDocumentIds]
   );
 
   const processFile = useCallback(
@@ -220,6 +407,11 @@ export function RealReaderApp() {
       setActiveTab("reader");
       setSelectedPageIndex(0);
       setDocument(null);
+      setProgress({
+        phase: "loading",
+        message: "Preparando seu conteúdo...",
+        progress: 0
+      });
       speech.stop();
 
       try {
@@ -228,6 +420,12 @@ export function RealReaderApp() {
         if (!sourceType) {
           throw new Error(
             "Nesta V1.3, envie PDF ou imagem (PNG, JPG, WEBP). Documentos DOCX ficam para uma etapa futura."
+          );
+        }
+
+        if (file.size > MAX_LOCAL_UPLOAD_BYTES) {
+          throw new Error(
+            "Arquivo grande demais para processamento local. Envie um arquivo de até 80 MB."
           );
         }
 
@@ -313,7 +511,7 @@ export function RealReaderApp() {
         setSelectedPageIndex(0);
         setProgress({
           phase: "done",
-          message: "Imagem pronta para leitura.",
+          message: "Seu conteúdo está pronto para ouvir.",
           progress: 1,
           totalPages: imagePages.length,
           currentPage: imagePages.length
@@ -457,11 +655,25 @@ export function RealReaderApp() {
 
   const handleDrop = (event: DragEvent<HTMLDivElement>) => {
     event.preventDefault();
+    setIsDraggingFile(false);
     const file = event.dataTransfer.files?.[0];
 
     if (file) {
       void processFile(file);
     }
+  };
+
+  const handleDragOver = (event: DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    setIsDraggingFile(true);
+  };
+
+  const handleDragLeave = (event: DragEvent<HTMLDivElement>) => {
+    if (event.currentTarget.contains(event.relatedTarget as Node | null)) {
+      return;
+    }
+
+    setIsDraggingFile(false);
   };
 
   const handleCancelProcessing = () => {
@@ -490,6 +702,69 @@ export function RealReaderApp() {
   const handleClearHistory = () => {
     clearHistory();
     setHistory([]);
+  };
+
+  const handleRenameDocument = () => {
+    if (!document) {
+      return;
+    }
+
+    const nextName = window.prompt("Novo nome do documento", document.name)?.trim();
+
+    if (!nextName) {
+      return;
+    }
+
+    persistDocument({
+      ...document,
+      name: nextName,
+      processedAt: new Date().toISOString()
+    });
+  };
+
+  const handleDeleteCurrentDocument = () => {
+    if (!document) {
+      return;
+    }
+
+    speech.stop();
+    setHistory(removeDocumentFromHistory(document.id));
+    setFavoriteDocumentIds((current) => {
+      const next = current.filter((id) => id !== document.id);
+      window.localStorage.setItem(FAVORITES_KEY, JSON.stringify(next));
+      return next;
+    });
+    sourceFileRef.current = null;
+    setDocument(null);
+    setSelectedPageIndex(0);
+    setProgress(initialProgress);
+    setError("");
+    setMp3Message("");
+    setVoiceMessage("");
+
+    if (account?.authenticated) {
+      void deleteDocumentFromCloud(document.id);
+    }
+  };
+
+  const toggleFavoriteDocument = () => {
+    if (!document) {
+      return;
+    }
+
+    setFavoriteDocumentIds((current) => {
+      const next = current.includes(document.id)
+        ? current.filter((id) => id !== document.id)
+        : [...current, document.id];
+
+      window.localStorage.setItem(FAVORITES_KEY, JSON.stringify(next));
+
+      if (account?.authenticated) {
+        void updateCloudFavorite(document.id, next.includes(document.id));
+      }
+
+      return next;
+    });
   };
 
   const handleDownloadText = () => {
@@ -827,6 +1102,11 @@ export function RealReaderApp() {
 
   const canUseSourcePdf = Boolean(document?.sourceType === "pdf" && sourceFileRef.current);
   const progressPercent = Math.round((progress.progress ?? 0) * 100);
+  const selectedVoiceName =
+    voiceMode === "browser" ? "Voz local" : selectedVoiceProfile?.name ?? "Voz neural";
+  const isCurrentDocumentFavorite = document
+    ? favoriteDocumentIds.includes(document.id)
+    : false;
 
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-7xl flex-col px-4 py-6 sm:px-6 lg:px-8">
@@ -847,6 +1127,9 @@ export function RealReaderApp() {
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-real-600">
             Plano atual: {currentPlan.name}
           </p>
+          <p className="mt-2 max-w-xs text-xs leading-5 text-slate-600">
+            {accountMessage}
+          </p>
           <div className="mt-3 grid grid-cols-2 gap-2 text-sm text-slate-700">
             <FeaturePill label={`${currentPlan.maxPagesPerPdf} págs/PDF`} />
             <FeaturePill label={isPremiumPlan ? "Voz neural" : "Voz local"} />
@@ -858,12 +1141,16 @@ export function RealReaderApp() {
             >
               Ver planos
             </a>
-            <a
-              href="/login"
-              className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-black text-slate-700 transition hover:bg-slate-50"
-            >
-              Login
-            </a>
+            {account?.authenticated ? (
+              <LogoutButton />
+            ) : (
+              <a
+                href="/login"
+                className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-black text-slate-700 transition hover:bg-slate-50"
+              >
+                Login
+              </a>
+            )}
             <a
               href="/minha-voz"
               className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-black text-slate-700 transition hover:bg-slate-50"
@@ -897,8 +1184,15 @@ export function RealReaderApp() {
       <div className="grid flex-1 gap-6 lg:grid-cols-[360px_minmax(0,1fr)]">
         <aside className="space-y-6">
           <section
-            className="rounded-3xl border border-dashed border-real-200 bg-white/75 p-5 shadow-soft backdrop-blur"
-            onDragOver={(event) => event.preventDefault()}
+            className={[
+              "rounded-3xl border-2 border-dashed p-5 shadow-soft backdrop-blur transition-all duration-300",
+              isDraggingFile
+                ? "scale-[1.01] border-real-500 bg-real-50/95 shadow-lg"
+                : "border-real-200 bg-white/80 hover:border-real-300 hover:bg-white"
+            ].join(" ")}
+            onDragEnter={handleDragOver}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
             onDrop={handleDrop}
           >
             <input
@@ -908,24 +1202,34 @@ export function RealReaderApp() {
               className="hidden"
               onChange={handleInputChange}
             />
-            <div className="rounded-2xl bg-gradient-to-br from-real-600 to-real-900 p-5 text-white">
+            <div
+              className={[
+                "rounded-2xl bg-gradient-to-br from-real-600 to-real-950 p-5 text-white transition-all duration-300",
+                isDraggingFile || isProcessing ? "animate-pulse" : ""
+              ].join(" ")}
+            >
+              <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-white/15 text-3xl">
+                {isProcessing ? "⏳" : isDraggingFile ? "⬇" : "📄"}
+              </div>
               <p className="text-sm font-semibold uppercase tracking-[0.2em] text-real-100">
-                Enviar arquivo
+                Primeiro passo
               </p>
               <p className="mt-3 text-2xl font-black">
-                Escolha um PDF ou imagem para ouvir.
+                {isDraggingFile
+                  ? "Solte o arquivo para começar."
+                  : "Escolha um PDF para começar."}
               </p>
               <p className="mt-3 text-sm leading-6 text-real-50">
-                O modo rápido é o padrão. OCR completo só roda por intervalo ou
-                bloco, para não travar apostilas grandes.
+                Modo rápido primeiro. O objetivo é preparar seu conteúdo para
+                ouvir sem espera desnecessária.
               </p>
               <button
                 type="button"
-                className="mt-5 w-full rounded-2xl bg-white px-4 py-3 font-bold text-real-700 transition hover:-translate-y-0.5 hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-60"
+                className="mt-5 w-full rounded-2xl bg-white px-4 py-4 text-lg font-black text-real-700 transition hover:-translate-y-0.5 hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-60"
                 onClick={() => fileInputRef.current?.click()}
                 disabled={isProcessing}
               >
-                {isProcessing ? "Processando..." : "Escolher PDF"}
+                {isProcessing ? "Preparando..." : "Escolher arquivo"}
               </button>
             </div>
 
@@ -998,22 +1302,20 @@ export function RealReaderApp() {
         <section className="min-w-0 rounded-3xl border border-white/80 bg-white/80 p-5 shadow-soft backdrop-blur sm:p-6">
           {document ? (
             <div className="space-y-6">
-              <div className="grid gap-4 xl:grid-cols-[1fr_340px]">
-                <div>
-                  <p className="text-sm font-semibold uppercase tracking-[0.2em] text-real-600">
-                    Documento processado · {extractionModeLabel(document.extractionMode)}
-                  </p>
-                  <h2 className="mt-2 break-words text-3xl font-black text-ink">
-                    {document.name}
-                  </h2>
-                  <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-                    <Metric label="Páginas" value={document.pages.length} />
-                    <Metric label="Palavras" value={summary?.words ?? 0} />
-                    <Metric label="Texto direto" value={summary?.textPages ?? 0} />
-                    <Metric label="OCR" value={summary?.ocrPages ?? 0} />
-                    <Metric label="Direto + OCR" value={summary?.combinedPages ?? 0} />
-                  </div>
-                </div>
+              <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
+                <DocumentReadyCard
+                  document={document}
+                  words={summary?.words ?? 0}
+                  selectedVoiceName={selectedVoiceName}
+                  estimatedAudio={formatDuration(
+                    estimateReadingSeconds(document.pages, speech.rate)
+                  )}
+                  favorite={isCurrentDocumentFavorite}
+                  onListen={readDocument}
+                  onRename={handleRenameDocument}
+                  onDelete={handleDeleteCurrentDocument}
+                  onFavorite={toggleFavoriteDocument}
+                />
 
                 <StudyActions
                   hasText={document.totalChars > 0}
@@ -1051,13 +1353,11 @@ export function RealReaderApp() {
                 speech={speech}
                 pages={pages}
                 selectedPageIndex={selectedPageIndex}
-                selectedVoiceName={
-                  voiceMode === "browser"
-                    ? "Voz local"
-                    : selectedVoiceProfile?.name ?? "Voz neural"
-                }
+                selectedVoiceName={selectedVoiceName}
                 onPlayDocument={readDocument}
                 onPlayPage={() => startReadingPage(selectedPageIndex)}
+                onRewind15={speech.rewind15}
+                onForward15={speech.forward15}
                 onPrevious={() => {
                   speech.previousPage();
                   setSelectedPageIndex(Math.max(selectedPageIndex - 1, 0));
@@ -1186,7 +1486,7 @@ export function RealReaderApp() {
               )}
             </div>
           ) : (
-            <EmptyState />
+            <EmptyState onAddContent={() => fileInputRef.current?.click()} />
           )}
         </section>
       </div>
@@ -1214,28 +1514,44 @@ function ProgressCard({
   onCancel?: () => void;
 }) {
   const hasProgress = progress.phase !== "idle";
+  const copy = getProgressCopy(progress, percent);
 
   return (
-    <div className="mt-4 rounded-2xl bg-slate-50 p-4">
+    <div
+      className={[
+        "mt-4 rounded-3xl border p-4 transition-all duration-300",
+        progress.phase === "done"
+          ? "border-emerald-200 bg-emerald-50"
+          : hasProgress
+            ? "border-real-100 bg-real-50"
+            : "border-slate-200 bg-slate-50"
+      ].join(" ")}
+    >
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-sm font-bold text-ink">{progress.message}</p>
+          <p className="text-sm font-black text-ink">{copy.title}</p>
+          <p className="mt-1 text-sm leading-6 text-slate-600">{copy.detail}</p>
           {progress.currentPage !== undefined && progress.totalPages ? (
             <p className="mt-1 text-xs text-slate-500">
-              Processando página {progress.currentPage} de {progress.totalPages}
+              Página {progress.currentPage} de {progress.totalPages}
               {progress.sourcePage ? ` · página original ${progress.sourcePage}` : ""}
             </p>
           ) : null}
         </div>
         {hasProgress ? (
-          <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-real-700">
+          <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-real-700 shadow-sm">
             {Math.max(0, Math.min(100, percent))}%
           </span>
         ) : null}
       </div>
-      <div className="mt-3 h-2 overflow-hidden rounded-full bg-white">
+      <div className="mt-4 h-4 overflow-hidden rounded-full bg-white shadow-inner">
         <div
-          className="h-full rounded-full bg-real-500 transition-all"
+          className={[
+            "h-full rounded-full transition-all duration-500",
+            progress.phase === "done"
+              ? "bg-emerald-500"
+              : "bg-gradient-to-r from-real-500 to-real-700"
+          ].join(" ")}
           style={{
             width: hasProgress ? `${Math.max(4, Math.min(100, percent))}%` : "0%"
           }}
@@ -1255,15 +1571,46 @@ function ProgressCard({
   );
 }
 
-function Metric({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4">
-      <p className="text-2xl font-black text-ink">{value.toLocaleString("pt-BR")}</p>
-      <p className="mt-1 text-xs font-bold uppercase tracking-[0.16em] text-slate-500">
-        {label}
-      </p>
-    </div>
-  );
+function getProgressCopy(progress: ProcessingProgress, percent: number) {
+  if (progress.phase === "idle") {
+    return {
+      title: "Aguardando seu arquivo.",
+      detail: "Escolha um PDF ou imagem para começar."
+    };
+  }
+
+  if (progress.phase === "done") {
+    return {
+      title: "Seu conteúdo está pronto para ouvir.",
+      detail: "Agora é só apertar Play."
+    };
+  }
+
+  if (progress.phase === "error") {
+    return {
+      title: "Não consegui preparar este arquivo.",
+      detail: progress.message
+    };
+  }
+
+  if (percent >= 70) {
+    return {
+      title: "Quase pronto...",
+      detail: "Estou finalizando o texto para você ouvir."
+    };
+  }
+
+  if (progress.phase === "ocr") {
+    return {
+      title: "Lendo o que está em imagem...",
+      detail: "Isso ajuda em slides, prints e páginas escaneadas."
+    };
+  }
+
+  return {
+    title: "Preparando seu conteúdo...",
+    detail: "Estou abrindo o arquivo e separando as páginas."
+  };
 }
 
 function PlanStatusCard({
@@ -1314,6 +1661,101 @@ function UpgradePanel({ message }: { message: string }) {
         Ver planos
       </a>
     </section>
+  );
+}
+
+function DocumentReadyCard({
+  document,
+  words,
+  selectedVoiceName,
+  estimatedAudio,
+  favorite,
+  onListen,
+  onRename,
+  onDelete,
+  onFavorite
+}: {
+  document: ReaderDocument;
+  words: number;
+  selectedVoiceName: string;
+  estimatedAudio: string;
+  favorite: boolean;
+  onListen: () => void;
+  onRename: () => void;
+  onDelete: () => void;
+  onFavorite: () => void;
+}) {
+  return (
+    <article className="overflow-hidden rounded-[2rem] border border-real-100 bg-white shadow-soft">
+      <div className="bg-gradient-to-br from-real-700 to-ink p-5 text-white">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0">
+            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-real-100">
+              Seu conteúdo está pronto
+            </p>
+            <h2 className="mt-3 break-words text-3xl font-black">
+              📄 {document.name}
+            </h2>
+            <p className="mt-2 text-sm leading-6 text-real-50">
+              Enviado {formatRelativeDate(document.processedAt)} ·{" "}
+              {extractionModeLabel(document.extractionMode)}
+            </p>
+          </div>
+          <div className="flex h-24 w-20 shrink-0 items-center justify-center rounded-3xl bg-white/15 text-4xl shadow-inner">
+            📄
+          </div>
+        </div>
+
+        <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <DocumentFact label="Páginas" value={`📑 ${document.pages.length}`} />
+          <DocumentFact label="Tempo estimado" value={`⏱ ${estimatedAudio}`} />
+          <DocumentFact label="Voz" value={`🎧 ${selectedVoiceName}`} />
+          <DocumentFact label="Palavras" value={words.toLocaleString("pt-BR")} />
+        </div>
+      </div>
+
+      <div className="grid gap-2 p-4 sm:grid-cols-2 xl:grid-cols-4">
+        <button
+          type="button"
+          className="rounded-2xl bg-real-600 px-4 py-4 font-black text-white transition hover:-translate-y-0.5 hover:bg-real-700 hover:shadow-lg"
+          onClick={onListen}
+        >
+          ▶ Ouvir
+        </button>
+        <button
+          type="button"
+          className="rounded-2xl border border-slate-200 bg-white px-4 py-4 font-black text-slate-700 transition hover:-translate-y-0.5 hover:bg-slate-50"
+          onClick={onRename}
+        >
+          ✏ Renomear
+        </button>
+        <button
+          type="button"
+          className="rounded-2xl border border-slate-200 bg-white px-4 py-4 font-black text-slate-700 transition hover:-translate-y-0.5 hover:bg-slate-50"
+          onClick={onFavorite}
+        >
+          {favorite ? "⭐ Favorito" : "☆ Favoritar"}
+        </button>
+        <button
+          type="button"
+          className="rounded-2xl border border-red-100 bg-red-50 px-4 py-4 font-black text-red-700 transition hover:-translate-y-0.5 hover:bg-red-100"
+          onClick={onDelete}
+        >
+          🗑 Excluir
+        </button>
+      </div>
+    </article>
+  );
+}
+
+function DocumentFact({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-2xl bg-white/10 px-4 py-3">
+      <p className="text-xs font-bold uppercase tracking-[0.16em] text-real-100">
+        {label}
+      </p>
+      <p className="mt-1 truncate text-lg font-black text-white">{value}</p>
+    </div>
   );
 }
 
@@ -1370,7 +1812,7 @@ function StudyActions({
           onClick={onReadDocument}
           disabled={!hasText}
         >
-          Ler documento inteiro
+          ▶ Ouvir documento
         </button>
         <button
           type="button"
@@ -1378,7 +1820,7 @@ function StudyActions({
           onClick={onReadCurrentPage}
           disabled={!hasText}
         >
-          Ler somente página atual
+          Ouvir página atual
         </button>
         <button
           type="button"
@@ -1386,7 +1828,7 @@ function StudyActions({
           onClick={onReadBlock}
           disabled={!canUseBlocks || !selectedBlock || !selectedBlockPages.length}
         >
-          Ler bloco selecionado
+          Ouvir bloco selecionado
         </button>
         <div className="grid gap-2 sm:grid-cols-2">
           <button
@@ -1513,7 +1955,7 @@ function ContinueStudyingCard({
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <p className="text-sm font-semibold uppercase tracking-[0.2em] text-real-100">
-            Continuar estudando
+            Continue exatamente de onde parou.
           </p>
           <h2 className="mt-2 text-2xl font-black">
             {document?.lastRead
@@ -1521,8 +1963,7 @@ function ContinueStudyingCard({
               : `Voltar para ${latest?.name}`}
           </h2>
           <p className="mt-2 text-sm leading-6 text-real-50">
-            O usuário Premium não deve procurar onde parou. A experiência precisa
-            puxar o estudo de volta.
+            Retome o áudio sem procurar arquivo, página ou capítulo.
           </p>
         </div>
         <button
@@ -1539,7 +1980,7 @@ function ContinueStudyingCard({
             }
           }}
         >
-          Continuar agora
+          ▶ Continuar ouvindo
         </button>
       </div>
     </section>
@@ -1553,6 +1994,8 @@ function PremiumAudioPlayer({
   selectedVoiceName,
   onPlayDocument,
   onPlayPage,
+  onRewind15,
+  onForward15,
   onPrevious,
   onNext
 }: {
@@ -1562,6 +2005,8 @@ function PremiumAudioPlayer({
   selectedVoiceName: string;
   onPlayDocument: () => void;
   onPlayPage: () => void;
+  onRewind15: () => void;
+  onForward15: () => void;
   onPrevious: () => void;
   onNext: () => void;
 }) {
@@ -1574,78 +2019,119 @@ function PremiumAudioPlayer({
     pages.slice(activeIndex),
     speech.rate
   );
+  const currentSeconds = Math.max(0, totalSeconds - remainingSeconds);
   const progress = pages.length
     ? Math.round(((activeIndex + 1) / pages.length) * 100)
     : 0;
   const currentPage = pages[activeIndex];
+  const waveform = Array.from({ length: 36 }, (_, index) => {
+    const height = 22 + ((index * 17) % 38);
+    const active = index <= Math.round((progress / 100) * 36);
+
+    return { height, active };
+  });
 
   return (
-    <section className="rounded-[2rem] border border-slate-200 bg-gradient-to-br from-white to-real-50 p-5 shadow-soft">
+    <section className="rounded-[2rem] border border-slate-200 bg-gradient-to-br from-ink via-slate-900 to-real-950 p-5 text-white shadow-soft transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-real-600">
+          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-real-100">
             Player Premium
           </p>
-          <h3 className="mt-2 text-2xl font-black text-ink">
+          <h3 className="mt-2 text-2xl font-black">
             {currentPage ? `Capítulo atual: página ${currentPage.pageNumber}` : "Pronto para estudar"}
           </h3>
-          <p className="mt-1 text-sm text-slate-600">
-            Voz: <span className="font-black">{selectedVoiceName}</span> ·{" "}
-            {formatDuration(remainingSeconds)} restantes · {formatDuration(totalSeconds)} no total
+          <p className="mt-1 text-sm text-real-50">
+            <span aria-hidden="true">🎧</span> Voz:{" "}
+            <span className="font-black">{selectedVoiceName}</span> · velocidade{" "}
+            {speech.rate.toFixed(1)}x
           </p>
         </div>
-        <div className="rounded-2xl bg-white px-4 py-3 text-sm font-black text-real-700 shadow-sm">
-          Playlist futura preparada
+        <div className="rounded-2xl bg-white/10 px-4 py-3 text-sm font-black text-real-50 shadow-sm">
+          {formatDuration(currentSeconds)} ouvidos · {formatDuration(remainingSeconds)} restantes
         </div>
       </div>
 
       <div className="mt-5">
-        <div className="h-3 overflow-hidden rounded-full bg-white">
+        <div className="mb-4 flex h-16 items-end gap-1 overflow-hidden rounded-3xl bg-white/10 px-3 py-3">
+          {waveform.map((bar, index) => (
+            <span
+              key={index}
+              className={[
+                "flex-1 rounded-full transition-all duration-500",
+                bar.active ? "bg-real-300" : "bg-white/20"
+              ].join(" ")}
+              style={{ height: `${bar.height}%` }}
+            />
+          ))}
+        </div>
+        <div className="h-5 overflow-hidden rounded-full bg-white/15 shadow-inner">
           <div
-            className="h-full rounded-full bg-real-600 transition-all"
+            className="h-full rounded-full bg-gradient-to-r from-real-300 via-real-400 to-white transition-all duration-500"
             style={{ width: `${Math.max(0, Math.min(100, progress))}%` }}
           />
         </div>
-        <div className="mt-2 flex justify-between text-xs font-bold text-slate-500">
-          <span>{progress}% do material processado</span>
-          <span>Velocidade {speech.rate.toFixed(1)}x</span>
+        <div className="mt-3 flex justify-between text-xs font-bold text-real-100">
+          <span>{formatDuration(currentSeconds)}</span>
+          <span>{progress}%</span>
+          <span>-{formatDuration(remainingSeconds)}</span>
         </div>
       </div>
 
-      <div className="mt-5 flex flex-wrap items-center gap-2">
+      <div className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">
         <button
           type="button"
-          className="rounded-full border border-slate-200 bg-white px-4 py-2 font-bold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
+          className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3 font-bold text-white transition hover:scale-[1.02] hover:bg-white/15 disabled:opacity-50"
           onClick={onPrevious}
           disabled={!pages.length}
         >
-          Capítulo anterior
+          ⏮ Cap.
         </button>
         <button
           type="button"
-          className="rounded-full bg-real-600 px-6 py-3 font-black text-white transition hover:bg-real-700 disabled:opacity-50"
+          className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3 font-bold text-white transition hover:scale-[1.02] hover:bg-white/15 disabled:opacity-50"
+          onClick={onRewind15}
+          disabled={!pages.length}
+        >
+          ↺ 15s
+        </button>
+        <button
+          type="button"
+          className="rounded-2xl bg-white px-6 py-3 font-black text-ink transition hover:scale-[1.02] hover:shadow-lg disabled:opacity-50"
           onClick={speech.status === "playing" ? speech.pause : onPlayDocument}
           disabled={!pages.length}
         >
-          {speech.status === "playing" ? "Pausar" : "Play"}
+          {speech.status === "playing" ? "⏸ Pausar" : "▶ Play"}
         </button>
         <button
           type="button"
-          className="rounded-full border border-slate-200 bg-white px-4 py-2 font-bold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
+          className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3 font-bold text-white transition hover:scale-[1.02] hover:bg-white/15 disabled:opacity-50"
           onClick={speech.status === "paused" ? speech.resume : onPlayPage}
           disabled={!pages.length}
         >
-          {speech.status === "paused" ? "Continuar" : "Página atual"}
+          {speech.status === "paused" ? "Continuar" : "Página"}
         </button>
         <button
           type="button"
-          className="rounded-full border border-slate-200 bg-white px-4 py-2 font-bold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
+          className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3 font-bold text-white transition hover:scale-[1.02] hover:bg-white/15 disabled:opacity-50"
+          onClick={onForward15}
+          disabled={!pages.length}
+        >
+          15s ↻
+        </button>
+        <button
+          type="button"
+          className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3 font-bold text-white transition hover:scale-[1.02] hover:bg-white/15 disabled:opacity-50"
           onClick={onNext}
           disabled={!pages.length}
         >
-          Próximo capítulo
+          Cap. ⏭
         </button>
       </div>
+      <p className="mt-3 text-xs leading-5 text-real-100">
+        No modo local do navegador, voltar/avançar 15s pula blocos curtos de
+        leitura. Em MP3 neural futuro, esse controle poderá buscar tempo real.
+      </p>
     </section>
   );
 }
@@ -2327,7 +2813,7 @@ function PageTextPanel({
               onClick={() => onRead(selectedPageIndex)}
               disabled={!canRead}
             >
-              Ler esta página
+              Ouvir esta página
             </button>
           </div>
 
@@ -2395,19 +2881,29 @@ function NumberField({
   );
 }
 
-function EmptyState() {
+function EmptyState({ onAddContent }: { onAddContent: () => void }) {
   return (
-    <div className="flex min-h-[620px] items-center justify-center rounded-3xl border border-dashed border-slate-200 bg-white/60 p-8 text-center">
+    <div className="flex min-h-[620px] items-center justify-center rounded-3xl border-2 border-dashed border-real-100 bg-gradient-to-br from-white to-real-50 p-6 text-center sm:p-8">
       <div className="max-w-xl">
-        <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-3xl bg-real-50 text-3xl">
-          PDF
+        <div className="mx-auto flex h-24 w-24 items-center justify-center rounded-[2rem] bg-real-600 text-5xl text-white shadow-soft transition hover:scale-105">
+          📄
         </div>
         <h2 className="mt-6 text-3xl font-black text-ink">
-          Envie um arquivo para começar.
+          Escolha um PDF para começar.
         </h2>
-        <p className="mt-3 text-slate-600">
-          Comece pelo modo rápido. Para apostilas grandes, crie intervalos ou
-          blocos e rode OCR completo só no trecho que você precisa estudar.
+        <p className="mx-auto mt-3 max-w-md leading-7 text-slate-600">
+          Em poucos segundos o REAL Reader prepara o texto e libera o botão de
+          ouvir. Primeiro teste rápido, depois você decide se quer Premium.
+        </p>
+        <button
+          type="button"
+          className="mt-6 rounded-2xl bg-real-600 px-6 py-4 text-lg font-black text-white shadow-soft transition hover:-translate-y-0.5 hover:bg-real-700 hover:shadow-lg"
+          onClick={onAddContent}
+        >
+          Escolher arquivo
+        </button>
+        <p className="mt-4 text-sm font-bold text-slate-500">
+          PDF, PNG, JPG, WEBP ou BMP
         </p>
       </div>
     </div>
@@ -2428,7 +2924,7 @@ function buildProcessingDoneMessage(
     return `Arquivo aberto no plano ${planName}. Este PDF tem ${totalPages} páginas; processei as primeiras ${maxPages} conforme o limite do plano.`;
   }
 
-  return "Arquivo pronto para leitura no modo rápido.";
+  return "Seu conteúdo está pronto para ouvir.";
 }
 
 function estimateReadingSeconds(pages: ReaderPage[], rate: number) {
@@ -2451,6 +2947,21 @@ function formatDuration(totalSeconds: number) {
   }
 
   return `${minutes}min`;
+}
+
+function formatRelativeDate(isoDate: string) {
+  const date = new Date(isoDate);
+  const today = new Date();
+  const sameDay =
+    date.getFullYear() === today.getFullYear() &&
+    date.getMonth() === today.getMonth() &&
+    date.getDate() === today.getDate();
+
+  if (sameDay) {
+    return "hoje";
+  }
+
+  return date.toLocaleDateString("pt-BR");
 }
 
 function getMp3Target(
@@ -2481,6 +2992,52 @@ function getMp3Target(
     title: document.name,
     pages: document.pages
   };
+}
+
+async function syncDocumentToCloud(document: ReaderDocument, favorite: boolean) {
+  await fetch("/api/documents", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      document,
+      favorite
+    })
+  }).catch(() => null);
+}
+
+async function deleteDocumentFromCloud(documentId: string) {
+  await fetch(`/api/documents/${encodeURIComponent(documentId)}`, {
+    method: "DELETE"
+  }).catch(() => null);
+}
+
+async function updateCloudFavorite(documentId: string, favorite: boolean) {
+  await fetch(`/api/documents/${encodeURIComponent(documentId)}`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ favorite })
+  }).catch(() => null);
+}
+
+function mergeHistoryRecords(primary: HistoryRecord[], secondary: HistoryRecord[]) {
+  const byId = new Map<string, HistoryRecord>();
+
+  for (const record of [...primary, ...secondary]) {
+    byId.set(record.id, record);
+  }
+
+  return Array.from(byId.values()).sort(
+    (a, b) =>
+      new Date(b.processedAt).getTime() - new Date(a.processedAt).getTime()
+  );
+}
+
+function mergeUniqueIds(primary: string[], secondary: string[]) {
+  return Array.from(new Set([...primary, ...secondary]));
 }
 
 function getSourceType(file: File): SourceType | null {

@@ -44,6 +44,16 @@ export function clearHistory() {
   window.localStorage.removeItem(HISTORY_KEY);
 }
 
+export function removeDocumentFromHistory(documentId: string) {
+  if (typeof window === "undefined") {
+    return [];
+  }
+
+  const next = readHistory().filter((item) => item.id !== documentId);
+  window.localStorage.setItem(HISTORY_KEY, JSON.stringify(next));
+  return next;
+}
+
 function shrinkDocumentForStorage(document: ReaderDocument): ReaderDocument {
   return {
     ...document,

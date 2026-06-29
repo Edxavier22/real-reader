@@ -9,7 +9,8 @@ type ReaderStatus = "idle" | "playing" | "paused" | "finished" | "unsupported";
 type PlayPage = (
   pageIndex: number,
   endPageIndex?: number,
-  forceAdvance?: boolean
+  forceAdvance?: boolean,
+  startChunkIndex?: number
 ) => void;
 
 export function useSpeechReader(pages: ReaderPage[]) {
@@ -115,7 +116,8 @@ export function useSpeechReader(pages: ReaderPage[]) {
     playPageRef.current = (
       requestedPageIndex: number,
       requestedEndPageIndex = pagesRef.current.length - 1,
-      forceAdvance = false
+      forceAdvance = false,
+      requestedChunkIndex = 0
     ) => {
       if (typeof window === "undefined" || !("speechSynthesis" in window)) {
         setStatus("unsupported");
@@ -152,10 +154,10 @@ export function useSpeechReader(pages: ReaderPage[]) {
       const runId = runIdRef.current + 1;
       runIdRef.current = runId;
       const chunks = splitIntoSpeechChunks(page.text);
-      let chunkIndex = 0;
+      let chunkIndex = clampIndex(requestedChunkIndex, chunks.length);
 
       setCurrentPageIndex(pageIndex);
-      setCurrentChunkIndex(0);
+      setCurrentChunkIndex(chunkIndex);
 
       const speakNextChunk = () => {
         if (runIdRef.current !== runId) {
@@ -257,6 +259,32 @@ export function useSpeechReader(pages: ReaderPage[]) {
     }
   }, [currentPageIndex, status]);
 
+  const rewind15 = useCallback(() => {
+    if (!pagesRef.current.length) {
+      return;
+    }
+
+    playPageRef.current(
+      currentPageIndex,
+      currentPageIndex,
+      false,
+      Math.max(currentChunkIndex - 1, 0)
+    );
+  }, [currentChunkIndex, currentPageIndex]);
+
+  const forward15 = useCallback(() => {
+    if (!pagesRef.current.length) {
+      return;
+    }
+
+    playPageRef.current(
+      currentPageIndex,
+      currentPageIndex,
+      false,
+      currentChunkIndex + 1
+    );
+  }, [currentChunkIndex, currentPageIndex]);
+
   const setRate = useCallback((nextRate: number) => {
     setRateState(nextRate);
     rateRef.current = nextRate;
@@ -287,7 +315,9 @@ export function useSpeechReader(pages: ReaderPage[]) {
     resume,
     stop,
     nextPage,
-    previousPage
+    previousPage,
+    rewind15,
+    forward15
   };
 }
 

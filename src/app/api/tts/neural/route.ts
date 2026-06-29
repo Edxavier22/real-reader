@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
-import { resolveServerAccess } from "@/lib/commercial/auth";
+import { recordUsage, resolveServerAccess } from "@/lib/commercial/auth";
+import {
+  checkRateLimit,
+  getRequestIdentity
+} from "@/lib/commercial/rate-limit";
 import {
   createAudioCacheKey,
   getCachedAudio,
@@ -16,6 +20,19 @@ type NeuralRequestBody = {
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
+  const rate = checkRateLimit({
+    key: `tts-neural:${getRequestIdentity(request)}`,
+    limit: 20,
+    windowMs: 60_000
+  });
+
+  if (!rate.allowed) {
+    return NextResponse.json(
+      { error: "Muitas gerações em sequência. Aguarde um minuto." },
+      { status: 429 }
+    );
+  }
+
   let body: NeuralRequestBody;
 
   try {
@@ -36,9 +53,9 @@ export async function POST(request: Request) {
     );
   }
 
-  const access = resolveServerAccess(request);
+  const access = await resolveServerAccess(request);
 
-  if (!access.plan.features.neuralVoice) {
+  if (!access.isAuthenticated || !access.plan.features.neuralVoice) {
     return NextResponse.json(
       {
         error: "Voz neural é um recurso Premium.",
@@ -57,6 +74,20 @@ export async function POST(request: Request) {
         )} caracteres por geração.`
       },
       { status: 413 }
+    );
+  }
+
+  if (
+    access.usage &&
+    access.usage.voice_characters + text.length > access.plan.monthlyNeuralChars
+  ) {
+    return NextResponse.json(
+      {
+        error: "Limite mensal de voz neural atingido.",
+        details:
+          "Seu limite mensal de caracteres foi consumido. Aguarde a renovação do ciclo."
+      },
+      { status: 402 }
     );
   }
 
@@ -105,6 +136,12 @@ export async function POST(request: Request) {
       voiceId: result.voiceId
     });
 
+    if (access.userId) {
+      await recordUsage(access.userId, {
+        voice_characters: result.characterCount
+      });
+    }
+
     return new Response(result.audio, {
       status: 200,
       headers: {
@@ -120,7 +157,8 @@ export async function POST(request: Request) {
     return NextResponse.json(
       {
         error: "Falha ao gerar áudio neural.",
-        details: error instanceof Error ? error.message : "Erro desconhecido."
+        details: error instanceof Error ? error.message : "Erro desconhecido.",
+        fallbackVoiceMode: "browser"
       },
       { status: 502 }
     );
